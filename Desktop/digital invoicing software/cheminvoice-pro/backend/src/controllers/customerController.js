@@ -5,13 +5,23 @@ const prisma = new PrismaClient();
 
 const createCustomer = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
-  const data = req.body;
-
-  const company = await prisma.company.findUnique({ where: { id: companyId } });
-  if (!company) throw new AppError('Company not found', 404);
+  const { businessName, ntn, cnic, strn, address, province, city, registrationType, contactPerson, contactPhone, contactEmail } = req.body;
 
   const customer = await prisma.customer.create({
-    data: { ...data, companyId },
+    data: {
+      businessName,
+      ntn: ntn || null,
+      cnic: cnic || null,
+      strn: strn || null,
+      address: address || null,
+      province: province || null,
+      city: city || null,
+      registrationType: registrationType || 'UNREGISTERED',
+      contactPerson: contactPerson || null,
+      contactPhone: contactPhone || null,
+      contactEmail: contactEmail || null,
+      companyId,
+    },
   });
 
   res.status(201).json({ success: true, customer });
@@ -43,9 +53,22 @@ const getCustomer = asyncHandler(async (req, res) => {
 
 const updateCustomer = asyncHandler(async (req, res) => {
   const { customerId } = req.params;
+  const { businessName, ntn, cnic, strn, address, province, city, registrationType, contactPerson, contactPhone, contactEmail } = req.body;
   const customer = await prisma.customer.update({
     where: { id: customerId },
-    data: req.body,
+    data: {
+      businessName,
+      ntn: ntn || null,
+      cnic: cnic || null,
+      strn: strn || null,
+      address: address || null,
+      province: province || null,
+      city: city || null,
+      registrationType: registrationType || 'UNREGISTERED',
+      contactPerson: contactPerson || null,
+      contactPhone: contactPhone || null,
+      contactEmail: contactEmail || null,
+    },
   });
   res.json({ success: true, customer });
 });

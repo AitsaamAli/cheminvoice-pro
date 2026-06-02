@@ -5,13 +5,12 @@ const prisma = new PrismaClient();
 
 const createProduct = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
-  const data = req.body;
 
-  const company = await prisma.company.findUnique({ where: { id: companyId } });
-  if (!company) throw new AppError('Company not found', 404);
+  // Only pass fields that exist in the database schema
+  const { productName, productCode, hsCode, description, unitOfMeasure, defaultSalePrice, defaultTaxRate } = req.body;
 
   const product = await prisma.product.create({
-    data: { ...data, companyId },
+    data: { productName, productCode, hsCode, description: description || null, unitOfMeasure, defaultSalePrice, defaultTaxRate, companyId },
   });
 
   res.status(201).json({ success: true, product });
@@ -43,9 +42,10 @@ const getProduct = asyncHandler(async (req, res) => {
 
 const updateProduct = asyncHandler(async (req, res) => {
   const { productId } = req.params;
+  const { productName, productCode, hsCode, description, unitOfMeasure, defaultSalePrice, defaultTaxRate } = req.body;
   const product = await prisma.product.update({
     where: { id: productId },
-    data: req.body,
+    data: { productName, productCode, hsCode, description: description || null, unitOfMeasure, defaultSalePrice, defaultTaxRate },
   });
   res.json({ success: true, product });
 });
