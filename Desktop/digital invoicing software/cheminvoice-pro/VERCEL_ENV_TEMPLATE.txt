@@ -1,0 +1,156 @@
+═══════════════════════════════════════════════════════════════════════
+           VERCEL ENVIRONMENT VARIABLES - COPY & PASTE
+═══════════════════════════════════════════════════════════════════════
+
+BACKEND ENVIRONMENT VARIABLES (backend/.env)
+─────────────────────────────────────────────────────────────────────
+
+# Database Connection (from Neon)
+DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+
+# JWT Secrets (CHANGE THESE!)
+JWT_SECRET=your-super-secret-key-min-32-chars-change-this
+JWT_REFRESH_SECRET=your-super-secret-refresh-key-min-32-chars
+
+# SendGrid (from SendGrid account)
+SENDGRID_API_KEY=SG.YOUR_SENDGRID_API_KEY_HERE
+SENDGRID_FROM_EMAIL=noreply@cheminvoice.pk
+
+# FBR Configuration
+FBR_MODE=sandbox
+FBR_SANDBOX_URL=https://gw.fbr.gov.pk/imssandbox/api/Live/PostData
+FBR_SECURITY_TOKEN=test_token_sandbox_mode
+
+# Server Configuration
+PORT=5000
+NODE_ENV=production
+CORS_ORIGIN=https://your-frontend.vercel.app
+
+# Optional
+PDF_MARGIN_TOP=10
+PDF_MARGIN_BOTTOM=10
+PDF_MARGIN_LEFT=10
+PDF_MARGIN_RIGHT=10
+LOG_LEVEL=debug
+
+═══════════════════════════════════════════════════════════════════════
+
+FRONTEND ENVIRONMENT VARIABLES (frontend/.env.local)
+─────────────────────────────────────────────────────────────────────
+
+VITE_API_URL=https://your-backend.vercel.app/api
+
+═══════════════════════════════════════════════════════════════════════
+
+HOW TO GET EACH VALUE:
+─────────────────────────────────────────────────────────────────────
+
+1. DATABASE_URL:
+   - Go to Neon.tech dashboard
+   - Select your project
+   - Copy connection string from "Connection string" section
+   - Format: postgresql://user:pass@host/db?sslmode=require
+
+2. JWT_SECRET & JWT_REFRESH_SECRET:
+   - Generate random 32+ character strings
+   - Use: https://randomkeygen.com/ (copy "Secure Passwords")
+   - Make them different
+
+3. SENDGRID_API_KEY:
+   - Go to SendGrid dashboard
+   - Settings → API Keys
+   - Create new key
+   - Copy immediately (you only see it once!)
+
+4. SENDGRID_FROM_EMAIL:
+   - Use your verified email from SendGrid
+   - Example: noreply@yourdomain.com
+
+5. CORS_ORIGIN:
+   - Your Vercel frontend URL
+   - Example: https://cheminvoice-pro.vercel.app
+
+6. VITE_API_URL:
+   - Your Vercel backend URL
+   - Example: https://cheminvoice-pro-api.vercel.app/api
+
+═══════════════════════════════════════════════════════════════════════
+
+STEP-BY-STEP TO ADD TO VERCEL:
+─────────────────────────────────────────────────────────────────────
+
+BACKEND (Vercel):
+1. Go to Vercel Dashboard
+2. Select cheminvoice-pro-backend project
+3. Settings → Environment Variables
+4. Click "Add New"
+5. Copy & paste each line below:
+
+---Copy the values below one by one---
+
+Key: DATABASE_URL
+Value: (Your Neon connection string)
+
+Key: JWT_SECRET
+Value: (Generate 32+ char random string)
+
+Key: JWT_REFRESH_SECRET
+Value: (Generate 32+ char random string)
+
+Key: SENDGRID_API_KEY
+Value: (Your SendGrid API key)
+
+Key: SENDGRID_FROM_EMAIL
+Value: noreply@cheminvoice.pk
+
+Key: FBR_MODE
+Value: sandbox
+
+Key: NODE_ENV
+Value: production
+
+Key: CORS_ORIGIN
+Value: https://your-frontend-vercel-url.vercel.app
+
+---End copy---
+
+6. Click "Save"
+7. Redeploy (Vercel auto-redeploys)
+
+FRONTEND (Vercel):
+1. Go to Vercel Dashboard
+2. Select cheminvoice-pro-frontend project
+3. Settings → Environment Variables
+4. Click "Add New"
+
+Key: VITE_API_URL
+Value: https://your-backend-vercel-url.vercel.app/api
+
+5. Click "Save"
+6. Redeploy
+
+═══════════════════════════════════════════════════════════════════════
+
+AFTER DEPLOYMENT:
+─────────────────────────────────────────────────────────────────────
+
+Test everything works:
+
+1. Backend health check:
+   curl https://your-backend.vercel.app/health
+
+   Should return: {"status":"ok","timestamp":"..."}
+
+2. Frontend loads:
+   Open: https://your-frontend.vercel.app/login
+
+   Should show login form
+
+3. Customer portal:
+   Open: https://your-frontend.vercel.app/customer-portal
+
+   Should show email login
+
+If all work ✅ = Your system is LIVE!
+
+═══════════════════════════════════════════════════════════════════════
