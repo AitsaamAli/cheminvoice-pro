@@ -49,7 +49,9 @@ const createInvoice = asyncHandler(async (req, res) => {
     data: { lastInvoiceNumber: { increment: 1 } },
   });
 
-  const invoiceNumber = `CHEM-${new Date().getFullYear()}-${String(updatedCompany.lastInvoiceNumber).padStart(5, '0')}`;
+  // Company-specific invoice number ensures global uniqueness
+  const companyPrefix = companyId.slice(-4).toUpperCase();
+  const invoiceNumber = `CHEM-${companyPrefix}-${new Date().getFullYear()}-${String(updatedCompany.lastInvoiceNumber).padStart(4, '0')}`;
 
   const invoice = await prisma.invoice.create({
     data: {
