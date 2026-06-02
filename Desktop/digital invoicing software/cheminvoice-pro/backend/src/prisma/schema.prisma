@@ -1,0 +1,310 @@
+// This is your Prisma schema file for ChemInvoice Pro
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  password          String
+  firstName         String
+  lastName          String
+  ntn               String?
+  strn              String?
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id])
+  role              UserRole @default(VIEWER)
+  isActive          Boolean  @default(true)
+  lastLogin         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  auditLogs         AuditLog[]
+
+  @@index([companyId])
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  ACCOUNTANT
+  MANAGER
+  VIEWER
+}
+
+model Company {
+  id                    String   @id @default(cuid())
+  businessName          String
+  ntn                   String   @unique
+  strn                  String   @unique
+  address               String
+  province              String
+  city                  String
+  postalCode            String?
+  contactPhone          String?
+  contactEmail          String?
+  website               String?
+  logoUrl               String?
+  fbrApiToken           String?
+  fbrMode               String   @default("sandbox")
+  isSetupComplete       Boolean  @default(false)
+  lastInvoiceNumber     Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  users                 User[]
+  customers             Customer[]
+  products              Product[]
+  invoices              Invoice[]
+  taxConfigs            TaxConfig[]
+  fbrSubmissions        FBRSubmission[]
+
+  @@index([ntn])
+  @@index([strn])
+}
+
+model Customer {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id])
+  businessName          String
+  ntn                   String?
+  cnic                  String?
+  strn                  String?
+  address               String
+  province              String
+  city                  String
+  postalCode            String?
+  registrationType      RegistrationType @default(UNREGISTERED)
+  contactPerson         String?
+  contactPhone          String?
+  contactEmail          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  invoices              Invoice[]
+
+  @@unique([companyId, ntn])
+  @@unique([companyId, cnic])
+  @@index([companyId])
+  @@index([businessName])
+}
+
+enum RegistrationType {
+  REGISTERED
+  UNREGISTERED
+  FOREIGN
+}
+
+model Product {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id])
+  productName           String
+  productCode           String
+  hsCode                String   @db.VarChar(8)
+  description           String?
+  unitOfMeasure         UnitOfMeasure
+  defaultSalePrice      Decimal  @db.Decimal(15, 2)
+  defaultTaxRate        Decimal  @db.Decimal(5, 2)
+  chemicalCategory      String?
+  hazardClassification  String?
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  invoiceItems          InvoiceItem[]
+
+  @@unique([companyId, productCode])
+  @@index([companyId])
+  @@index([hsCode])
+}
+
+enum UnitOfMeasure {
+  KGM   // Kilogram
+  LTR   // Litre
+  TNE   // Tonne
+  DRM   // Drum
+  BAG
+  NUM   // Number/Piece
+}
+
+model Invoice {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id])
+  customerId            String
+  customer              Customer @relation(fields: [customerId], references: [id])
+  invoiceNumber         String   @unique
+  invoiceDate           DateTime
+  invoiceType           InvoiceType
+  referenceInvoiceNo    String?
+
+  sellerNtn             String
+  sellerStrn            String
+  sellerBusinessName    String
+  sellerAddress         String
+  sellerProvince        String
+
+  buyerRegistrationType RegistrationType
+  buyerNtn              String?
+  buyerCnic             String?
+  buyerStrn             String?
+  buyerBusinessName     String
+  buyerAddress          String
+  buyerProvince         String
+
+  totalTaxableValue     Decimal  @db.Decimal(15, 2)
+  totalSalesTax         Decimal  @db.Decimal(15, 2)
+  totalInvoiceAmount    Decimal  @db.Decimal(15, 2)
+  amountInWords         String?
+
+  status                InvoiceStatus @default(DRAFT)
+  paymentTerms          String?
+  deliveryTerms         String?
+  remarks               String?
+
+  fbrInvoiceNumber      String?
+  fbrQrCode             String?
+  fbrStatus             String?   @default("PENDING")
+  fbrRetryCount         Int       @default(0)
+  fbrLastError          String?
+
+  createdByUserId       String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  submittedAt           DateTime?
+
+  items                 InvoiceItem[]
+  fbrSubmission         FBRSubmission?
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+  @@index([invoiceDate])
+  @@index([fbrStatus])
+}
+
+enum InvoiceType {
+  NORMAL_SALES_TAX_INVOICE
+  DEBIT_NOTE
+  CREDIT_NOTE
+  EXPORT_INVOICE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SAVED
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  ERROR
+  CANCELLED
+}
+
+model InvoiceItem {
+  id                    String   @id @default(cuid())
+  invoiceId             String
+  invoice               Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId             String
+  product               Product  @relation(fields: [productId], references: [id])
+
+  hsCode                String   @db.VarChar(8)
+  productCode           String
+  productDescription    String
+  quantity              Decimal  @db.Decimal(12, 3)
+  unitOfMeasure         UnitOfMeasure
+  unitPrice             Decimal  @db.Decimal(15, 2)
+  discountAmount        Decimal  @db.Decimal(15, 2) @default(0)
+  taxableValue          Decimal  @db.Decimal(15, 2)
+  taxRate               Decimal  @db.Decimal(5, 2)
+  taxAmount             Decimal  @db.Decimal(15, 2)
+  totalAmount           Decimal  @db.Decimal(15, 2)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([productId])
+}
+
+model TaxConfig {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id])
+  taxRate               Decimal  @db.Decimal(5, 2)
+  taxDescription        String   // "Standard", "Reduced 5%", "Reduced 10%", "Zero-rated", "Exempt"
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+
+  @@unique([companyId, taxRate])
+  @@index([companyId])
+}
+
+model FBRSubmission {
+  id                    String   @id @default(cuid())
+  invoiceId             String   @unique
+  invoice               Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  payload               Json
+  response              Json?
+  fbrInvoiceNumber      String?
+  qrCodeData            String?
+
+  status                String   @default("PENDING")
+  errorMessage          String?
+  retryCount            Int      @default(0)
+  lastRetryAt           DateTime?
+
+  submittedAt           DateTime?
+  acceptedAt            DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([status])
+  @@index([submittedAt])
+}
+
+model AuditLog {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id])
+
+  action                String   // "CREATE", "UPDATE", "DELETE", "SUBMIT", etc.
+  entityType            String   // "INVOICE", "CUSTOMER", "PRODUCT", etc.
+  entityId              String
+
+  oldValues             Json?
+  newValues             Json?
+  description           String?
+
+  ipAddress             String?
+  userAgent             String?
+
+  createdAt             DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model PDFGeneration {
+  id                    String   @id @default(cuid())
+  invoiceId             String
+
+  pdfPath               String
+  fileSize              Int
+  generatedAt           DateTime @default(now())
+  expiresAt             DateTime
+
+  createdAt             DateTime @default(now())
+
+  @@index([invoiceId])
+}

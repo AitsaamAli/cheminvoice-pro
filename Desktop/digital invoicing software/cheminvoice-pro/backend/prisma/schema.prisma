@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      String   @default("VIEWER")
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model Company {
+  id                String   @id @default(cuid())
+  businessName      String
+  ntn               String   @unique
+  strn              String   @unique
+  address           String
+  province          String
+  city              String
+  postalCode        String?
+  contactPhone      String?
+  contactEmail      String?
+  fbrApiToken       String?
+  fbrMode           String   @default("sandbox")
+  lastInvoiceNumber Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users     User[]
+  customers Customer[]
+  products  Product[]
+  invoices  Invoice[]
+  taxConfigs TaxConfig[]
+
+  @@index([ntn])
+}
+
+model Customer {
+  id               String   @id @default(cuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  businessName     String
+  ntn              String?
+  cnic             String?
+  strn             String?
+  address          String
+  province         String
+  city             String
+  registrationType String   @default("UNREGISTERED")
+  contactPerson    String?
+  contactPhone     String?
+  contactEmail     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  invoices Invoice[]
+
+  @@index([companyId])
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  productName      String
+  productCode      String
+  hsCode           String
+  description      String?
+  unitOfMeasure    String
+  defaultSalePrice Float
+  defaultTaxRate   Float
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  invoiceItems InvoiceItem[]
+
+  @@index([companyId])
+}
+
+model Invoice {
+  id                    String   @id @default(cuid())
+  companyId             String
+  company               Company  @relation(fields: [companyId], references: [id])
+  customerId            String
+  customer              Customer @relation(fields: [customerId], references: [id])
+  invoiceNumber         String   @unique
+  invoiceDate           DateTime
+  invoiceType           String
+  referenceInvoiceNo    String?
+
+  sellerNtn             String
+  sellerStrn            String
+  sellerBusinessName    String
+  sellerAddress         String
+  sellerProvince        String
+
+  buyerRegistrationType String
+  buyerNtn              String?
+  buyerCnic             String?
+  buyerStrn             String?
+  buyerBusinessName     String
+  buyerAddress          String
+  buyerProvince         String
+
+  totalTaxableValue     Float
+  totalSalesTax         Float
+  totalInvoiceAmount    Float
+  amountInWords         String?
+
+  status                String   @default("DRAFT")
+  paymentTerms          String?
+  deliveryTerms         String?
+  remarks               String?
+
+  fbrInvoiceNumber      String?
+  fbrQrCode             String?
+  fbrStatus             String   @default("PENDING")
+  fbrRetryCount         Int      @default(0)
+  fbrLastError          String?
+
+  createdByUserId       String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  submittedAt           DateTime?
+
+  items                 InvoiceItem[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([invoiceDate])
+}
+
+model InvoiceItem {
+  id                    String   @id @default(cuid())
+  invoiceId             String
+  invoice               Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId             String
+  product               Product  @relation(fields: [productId], references: [id])
+
+  hsCode                String
+  productCode           String
+  productDescription    String
+  quantity              Float
+  unitOfMeasure         String
+  unitPrice             Float
+  discountAmount        Float @default(0)
+  taxableValue          Float
+  taxRate               Float
+  taxAmount             Float
+  totalAmount           Float
+
+  createdAt             DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model TaxConfig {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  taxRate         Float
+  taxDescription  String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model FBRSubmission {
+  id               String   @id @default(cuid())
+  invoiceId        String
+  payload          String
+  response         String?
+  fbrInvoiceNumber String?
+  qrCodeData       String?
+  status           String   @default("PENDING")
+  errorMessage     String?
+  retryCount       Int      @default(0)
+  lastRetryAt      DateTime?
+  submittedAt      DateTime?
+  acceptedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([invoiceId])
+  @@index([status])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  action      String
+  entityType  String
+  entityId    String
+  oldValues   String?
+  newValues   String?
+  description String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+}
+
+model PDFGeneration {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  pdfPath     String
+  fileSize    Int
+  generatedAt DateTime @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model LoginCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([code])
+}
