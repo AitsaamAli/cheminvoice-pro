@@ -31,12 +31,12 @@ const register = asyncHandler(async (req, res) => {
 
   const company = await prisma.company.create({
     data: {
-      businessName,
-      ntn,
-      strn,
-      address,
-      province,
-      city,
+      businessName: businessName || `${firstName} ${lastName} Company`,
+      ntn: ntn || '0000000',
+      strn: strn || '0000000000000',
+      address: address || 'Pakistan',
+      province: province || 'Punjab',
+      city: city || 'Lahore',
     },
   });
 

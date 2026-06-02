@@ -149,14 +149,25 @@ const generatePDF = asyncHandler(async (req, res) => {
 
   if (!invoice) throw new AppError('Invoice not found', 404);
 
-  const pdfPath = await pdfService.generateInvoicePDF(
-    invoice,
-    invoice.items,
-    invoice.company,
-    invoice.customer
-  );
+  // Flatten company and customer fields into invoice object for PDF
+  const invoiceData = {
+    ...invoice,
+    sellerBusinessName: invoice.company?.businessName || invoice.sellerBusinessName,
+    sellerNtn: invoice.company?.ntn || invoice.sellerNtn,
+    sellerStrn: invoice.company?.strn || invoice.sellerStrn,
+    sellerAddress: invoice.company?.address || invoice.sellerAddress,
+    sellerProvince: invoice.company?.province || invoice.sellerProvince,
+    buyerBusinessName: invoice.customer?.businessName || invoice.buyerBusinessName,
+    buyerAddress: invoice.customer?.address || invoice.buyerAddress,
+    buyerProvince: invoice.customer?.province || invoice.buyerProvince,
+    buyerNtn: invoice.customer?.ntn || invoice.buyerNtn,
+  };
 
-  res.download(pdfPath);
+  const pdfBuffer = await pdfService.generateInvoicePDF(invoiceData);
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`);
+  res.send(pdfBuffer);
 });
 
 // List invoices

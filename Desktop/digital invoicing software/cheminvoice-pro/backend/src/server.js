@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-if (process.env.NODE_ENV !== 'production') require('dotenv').config();
+require('dotenv').config();
 
 const { errorHandler, notFoundHandler, asyncHandler } = require('./middleware/errorHandler');
 const { verifyToken, checkRole } = require('./middleware/authMiddleware');
