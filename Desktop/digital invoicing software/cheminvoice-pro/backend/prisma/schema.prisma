@@ -27,8 +27,8 @@ model User {
 model Company {
   id                String   @id @default(cuid())
   businessName      String
-  ntn               String   @unique
-  strn              String   @unique
+  ntn               String
+  strn              String
   address           String
   province          String
   city              String
@@ -58,9 +58,9 @@ model Customer {
   ntn              String?
   cnic             String?
   strn             String?
-  address          String
-  province         String
-  city             String
+  address          String?
+  province         String?
+  city             String?
   registrationType String   @default("UNREGISTERED")
   contactPerson    String?
   contactPhone     String?

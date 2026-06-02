@@ -15,20 +15,13 @@ const createInvoice = asyncHandler(async (req, res) => {
 
   if (!company || !customer) throw new AppError('Company or customer not found', 404);
 
-  // Generate sequential invoice number
-  const nextInvoiceNumber = company.lastInvoiceNumber + 1;
-  const invoiceNumber = `CHEM-${new Date().getFullYear()}-${String(nextInvoiceNumber).padStart(5, '0')}`;
-
-  // Fetch product details and calculate totals
+  // Fetch product details
   const invoiceItems = await Promise.all(
     items.map(async (item) => {
       const product = await prisma.product.findUnique({ where: { id: item.productId } });
-      if (!product) throw new AppError(`Product ${item.productId} not found`, 404);
-
+      if (!product) throw new AppError(`Product not found: ${item.productId}`, 404);
       const taxableValue = (item.quantity * item.unitPrice) - (item.discountAmount || 0);
       const taxAmount = taxableValue * (item.taxRate / 100);
-      const totalAmount = taxableValue + taxAmount;
-
       return {
         productId: item.productId,
         hsCode: product.hsCode,
@@ -41,16 +34,23 @@ const createInvoice = asyncHandler(async (req, res) => {
         taxableValue,
         taxRate: item.taxRate,
         taxAmount,
-        totalAmount,
+        totalAmount: taxableValue + taxAmount,
       };
     })
   );
 
-  const totalTaxableValue = invoiceItems.reduce((sum, item) => sum + item.taxableValue, 0);
-  const totalSalesTax = invoiceItems.reduce((sum, item) => sum + item.taxAmount, 0);
+  const totalTaxableValue = invoiceItems.reduce((sum, i) => sum + i.taxableValue, 0);
+  const totalSalesTax = invoiceItems.reduce((sum, i) => sum + i.taxAmount, 0);
   const totalInvoiceAmount = totalTaxableValue + totalSalesTax;
 
-  // Create invoice
+  // Atomically increment invoice counter and get new number
+  const updatedCompany = await prisma.company.update({
+    where: { id: companyId },
+    data: { lastInvoiceNumber: { increment: 1 } },
+  });
+
+  const invoiceNumber = `CHEM-${new Date().getFullYear()}-${String(updatedCompany.lastInvoiceNumber).padStart(5, '0')}`;
+
   const invoice = await prisma.invoice.create({
     data: {
       companyId,
@@ -58,37 +58,29 @@ const createInvoice = asyncHandler(async (req, res) => {
       invoiceNumber,
       invoiceDate: new Date(invoiceDate),
       invoiceType,
-      sellerNtn: company.ntn,
-      sellerStrn: company.strn,
+      sellerNtn: company.ntn || '',
+      sellerStrn: company.strn || '',
       sellerBusinessName: company.businessName,
-      sellerAddress: company.address,
-      sellerProvince: company.province,
+      sellerAddress: company.address || '',
+      sellerProvince: company.province || '',
       buyerRegistrationType: customer.registrationType,
       buyerNtn: customer.ntn,
       buyerCnic: customer.cnic,
       buyerStrn: customer.strn,
       buyerBusinessName: customer.businessName,
-      buyerAddress: customer.address,
-      buyerProvince: customer.province,
+      buyerAddress: customer.address || '',
+      buyerProvince: customer.province || '',
       totalTaxableValue,
       totalSalesTax,
       totalInvoiceAmount,
       status: 'DRAFT',
-      paymentTerms,
-      deliveryTerms,
-      remarks,
+      paymentTerms: paymentTerms || null,
+      deliveryTerms: deliveryTerms || null,
+      remarks: remarks || null,
       createdByUserId: req.user.id,
-      items: {
-        create: invoiceItems,
-      },
+      items: { create: invoiceItems },
     },
     include: { items: true },
-  });
-
-  // Update company last invoice number
-  await prisma.company.update({
-    where: { id: companyId },
-    data: { lastInvoiceNumber: nextInvoiceNumber },
   });
 
   res.status(201).json({
@@ -174,6 +166,9 @@ const generatePDF = asyncHandler(async (req, res) => {
 const listInvoices = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
   const { status, startDate, endDate, skip = 0, take = 20 } = req.query;
+
+  // Security: user can only access their own company
+  if (req.user.companyId !== companyId) throw new AppError('Access denied', 403);
 
   const where = { companyId };
   if (status) where.status = status;
