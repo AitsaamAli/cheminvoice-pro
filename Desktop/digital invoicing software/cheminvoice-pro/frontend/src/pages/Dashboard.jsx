@@ -1,185 +1,215 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
+import Layout from '../components/Layout';
+
+const IcPlus = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IcEye = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
+function StatCard({ label, value, sub, color, icon, delay }) {
+  return (
+    <div className={`stat-card animate-fade-up anim-delay-${delay}`}>
+      <div className="stat-icon-box" style={{ background: `${color}18` }}>
+        <span style={{ color }}>{icon}</span>
+      </div>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={{ color }}>{value}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
+    </div>
+  );
+}
+
+const statusBadge = (status) => {
+  const map = {
+    DRAFT: 'badge-neutral',
+    SAVED: 'badge-primary',
+    SUBMITTED: 'badge-info',
+    ACCEPTED: 'badge-success',
+    ERROR: 'badge-error',
+  };
+  return <span className={map[status] || 'badge-neutral'}>{status}</span>;
+};
+
+const fbrBadge = (status) => {
+  const map = {
+    ACCEPTED: 'badge-success',
+    PENDING: 'badge-warning',
+    ERROR: 'badge-error',
+  };
+  const s = status || 'PENDING';
+  return <span className={map[s] || 'badge-warning'}>{s}</span>;
+};
+
+const fmt = (n) => `PKR ${parseFloat(n || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 })}`;
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [invoices, setInvoices] = useState([]);
-  const [stats, setStats] = useState({ today: 0, monthly: 0, pending: 0 });
+  const [stats, setStats] = useState({ today: 0, monthly: 0, pending: 0, total: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
   }, []);
 
-  const loadData = async () => {
+  const load = async () => {
     try {
       const res = await API.get(`/companies/${user.companyId}/invoices?take=20`);
-      setInvoices(res.data.invoices);
-
-      const today = new Date().toDateString();
-      const todayInvoices = res.data.invoices.filter(i => new Date(i.invoiceDate).toDateString() === today);
-      const pending = res.data.invoices.filter(i => i.fbrStatus === 'PENDING' || i.status === 'DRAFT');
-
+      const all = res.data.invoices || [];
+      setInvoices(all);
+      const todayStr = new Date().toDateString();
       setStats({
-        today: todayInvoices.reduce((sum, i) => sum + parseFloat(i.totalInvoiceAmount), 0),
-        monthly: res.data.invoices.reduce((sum, i) => sum + parseFloat(i.totalInvoiceAmount), 0),
-        pending: pending.length,
+        today: all
+          .filter(i => new Date(i.invoiceDate).toDateString() === todayStr)
+          .reduce((s, i) => s + parseFloat(i.totalInvoiceAmount || 0), 0),
+        monthly: all.reduce((s, i) => s + parseFloat(i.totalInvoiceAmount || 0), 0),
+        pending: all.filter(i => !i.fbrStatus || i.fbrStatus === 'PENDING').length,
+        total: res.data.pagination?.total || all.length,
       });
-    } catch (error) {
-      console.error('Failed to load data:', error);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
+  const actions = (
+    <button className="btn btn-accent btn-sm" onClick={() => navigate('/invoices/create')}>
+      <IcPlus /><span>New Invoice</span>
+    </button>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">ChemInvoice Pro</h1>
-              <p className="text-gray-600">Welcome, {user.firstName} {user.lastName}</p>
-            </div>
-            <div className="flex gap-4">
-              <button
-                onClick={() => navigate('/invoices/create')}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold"
-              >
-                + New Invoice
-              </button>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
+    <Layout title={`Welcome, ${user.firstName || 'User'}`} actions={actions}>
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          label="Today's Sales"
+          value={fmt(stats.today)}
+          sub="Invoiced today"
+          color="#0C3D5E"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>}
+          delay={1}
+        />
+        <StatCard
+          label="Monthly Sales"
+          value={fmt(stats.monthly)}
+          sub="Last 20 invoices"
+          color="#00875A"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>}
+          delay={2}
+        />
+        <StatCard
+          label="Pending FBR"
+          value={String(stats.pending)}
+          sub="Awaiting submission"
+          color="#D97706"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
+          delay={3}
+        />
+        <StatCard
+          label="Total Invoices"
+          value={String(stats.total)}
+          sub="All time"
+          color="#2563EB"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+          delay={4}
+        />
+      </div>
 
-          {/* Navigation Menu */}
-          <nav className="border-t pt-3 flex gap-6">
-            <button onClick={() => navigate('/')} className="text-blue-600 font-semibold hover:underline">📊 Dashboard</button>
-            <button onClick={() => navigate('/invoices/create')} className="text-gray-600 hover:text-gray-800 font-semibold hover:underline">📝 Invoices</button>
-            <button onClick={() => navigate('/customers')} className="text-gray-600 hover:text-gray-800 font-semibold hover:underline">👥 Customers</button>
-            <button onClick={() => navigate('/products')} className="text-gray-600 hover:text-gray-800 font-semibold hover:underline">📦 Products</button>
-            <button onClick={() => navigate('/reports')} className="text-gray-600 hover:text-gray-800 font-semibold hover:underline">📈 Reports</button>
-            <button onClick={() => navigate('/settings')} className="text-gray-600 hover:text-gray-800 font-semibold hover:underline">⚙️ Settings</button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold">Today's Sales</p>
-            <p className="text-3xl font-bold text-blue-600 mt-2">
-              PKR {stats.today.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold">Monthly Sales</p>
-            <p className="text-3xl font-bold text-green-600 mt-2">
-              PKR {stats.monthly.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600 text-sm font-semibold">Pending FBR</p>
-            <p className="text-3xl font-bold text-orange-600 mt-2">{stats.pending}</p>
-            <p className="text-xs text-gray-500 mt-2">Invoices awaiting submission</p>
-          </div>
+      {/* Recent Invoices */}
+      <div className="card animate-fade-up anim-delay-4">
+        <div className="card-header">
+          <span className="card-title">Recent Invoices</span>
+          <button className="btn btn-outline btn-sm" onClick={() => navigate('/invoices/create')}>
+            <IcPlus /> Create
+          </button>
         </div>
 
-        {/* Invoices Table */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-bold text-gray-800">Recent Invoices</h2>
+        {loading ? (
+          <div className="p-6 space-y-3">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="skeleton h-12" />
+            ))}
           </div>
-
-          {loading ? (
-            <div className="p-6 text-center text-gray-500">Loading...</div>
-          ) : invoices.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">No invoices yet. Create your first invoice to get started.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Invoice No</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Customer</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Amount</th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">FBR Status</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
+        ) : invoices.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon-box">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </div>
+            <div className="empty-title">No invoices yet</div>
+            <div className="empty-desc mb-4">Create your first FBR-compliant invoice to get started</div>
+            <button className="btn btn-primary" onClick={() => navigate('/invoices/create')}>
+              <IcPlus /> Create First Invoice
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice No</th>
+                  <th>Customer</th>
+                  <th>Date</th>
+                  <th className="t-right">Amount</th>
+                  <th className="t-right">Tax</th>
+                  <th className="t-center">Status</th>
+                  <th className="t-center">FBR</th>
+                  <th className="t-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map(inv => (
+                  <tr key={inv.id}>
+                    <td>
+                      <span className="font-semibold text-neutral-800 font-numeric text-xs">
+                        {inv.invoiceNumber}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="font-medium text-neutral-800">{inv.customer?.businessName}</span>
+                    </td>
+                    <td className="text-neutral-500 text-xs">
+                      {new Date(inv.invoiceDate).toLocaleDateString('en-PK', { day:'2-digit', month:'short', year:'numeric' })}
+                    </td>
+                    <td className="t-right font-semibold font-numeric">
+                      {fmt(inv.totalInvoiceAmount)}
+                    </td>
+                    <td className="t-right text-xs text-neutral-500 font-numeric">
+                      {fmt(inv.totalSalesTax)}
+                    </td>
+                    <td className="t-center">{statusBadge(inv.status)}</td>
+                    <td className="t-center">{fbrBadge(inv.fbrStatus)}</td>
+                    <td className="t-center">
+                      <button
+                        onClick={() => navigate(`/invoices/${inv.id}/pdf`)}
+                        className="btn btn-ghost btn-sm text-primary gap-1"
+                      >
+                        <IcEye /><span className="hidden sm:inline">View</span>
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {invoices.map(invoice => (
-                    <tr key={invoice.id} className="border-t hover:bg-gray-50">
-                      <td className="px-6 py-4 font-semibold text-gray-800">{invoice.invoiceNumber}</td>
-                      <td className="px-6 py-4 text-gray-700">{invoice.customer.businessName}</td>
-                      <td className="px-6 py-4 text-gray-700">{new Date(invoice.invoiceDate).toLocaleDateString('en-PK')}</td>
-                      <td className="px-6 py-4 text-right font-semibold text-gray-800">
-                        PKR {parseFloat(invoice.totalInvoiceAmount).toLocaleString('en-PK', { maximumFractionDigits: 0 })}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          invoice.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
-                          invoice.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
-                          invoice.status === 'ERROR' ? 'bg-red-100 text-red-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
-                          {invoice.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          invoice.fbrStatus === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
-                          invoice.fbrStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {invoice.fbrStatus || 'PENDING'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => navigate(`/invoices/${invoice.id}/pdf`)}
-                          className="text-blue-600 hover:text-blue-800 font-semibold text-sm mr-3"
-                        >
-                          View
-                        </button>
-                        {invoice.status === 'SAVED' && (
-                          <button
-                            onClick={() => {/* Submit to FBR */}}
-                            className="text-green-600 hover:text-green-800 font-semibold text-sm"
-                          >
-                            Submit
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </Layout>
   );
 }

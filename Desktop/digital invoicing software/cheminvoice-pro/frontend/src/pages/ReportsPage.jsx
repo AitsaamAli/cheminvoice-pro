@@ -1,189 +1,174 @@
 import { useState, useEffect } from 'react';
 import { API } from '../App';
+import Layout from '../components/Layout';
+
+const fmt = (n) => `PKR ${parseFloat(n || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 })}`;
+
+const fbrBadge = (s) => {
+  const v = s || 'PENDING';
+  const map = { ACCEPTED: 'badge-success', PENDING: 'badge-warning', ERROR: 'badge-error' };
+  return <span className={map[v] || 'badge-warning'}>{v}</span>;
+};
 
 export default function ReportsPage() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+  const today = new Date();
+  const [range, setRange] = useState({
+    startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
+    endDate: today.toISOString().split('T')[0],
   });
 
-  useEffect(() => {
-    loadReports();
-  }, [dateRange]);
+  useEffect(() => { load(); }, [range]);
 
-  const loadReports = async () => {
+  const load = async () => {
+    setLoading(true);
     try {
-      const res = await API.get(`/companies/${user.companyId}/invoices?take=1000&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await API.get(
+        `/companies/${user.companyId}/invoices?take=1000&startDate=${range.startDate}&endDate=${range.endDate}`
+      );
       setInvoices(res.data.invoices || []);
-    } catch (error) {
-      console.error('Failed to load reports:', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
-  const calculateTotals = () => {
-    return invoices.reduce(
-      (acc, inv) => ({
-        totalAmount: acc.totalAmount + parseFloat(inv.totalInvoiceAmount),
-        totalTax: acc.totalTax + parseFloat(inv.totalSalesTax),
-        totalTaxable: acc.totalTaxable + parseFloat(inv.totalTaxableValue),
-        count: acc.count + 1,
-      }),
-      { totalAmount: 0, totalTax: 0, totalTaxable: 0, count: 0 }
-    );
-  };
+  const totals = invoices.reduce(
+    (a, i) => ({
+      count: a.count + 1,
+      taxable: a.taxable + parseFloat(i.totalTaxableValue || 0),
+      tax: a.tax + parseFloat(i.totalSalesTax || 0),
+      amount: a.amount + parseFloat(i.totalInvoiceAmount || 0),
+    }),
+    { count: 0, taxable: 0, tax: 0, amount: 0 }
+  );
 
-  const downloadExcel = () => {
-    alert('Excel export coming soon!');
-  };
-
-  const downloadPDF = () => {
-    alert('PDF report export coming soon!');
-  };
-
-  const totals = calculateTotals();
+  const setD = (k) => (e) => setRange(r => ({ ...r, [k]: e.target.value }));
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-4">Sales Reports</h1>
-
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <div className="flex justify-between items-end gap-4">
-              <div className="flex gap-4 flex-1">
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold mb-2">From Date</label>
-                  <input
-                    type="date"
-                    value={dateRange.startDate}
-                    onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold mb-2">To Date</label>
-                  <input
-                    type="date"
-                    value={dateRange.endDate}
-                    onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={downloadExcel}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-semibold"
-                >
-                  📊 Excel
-                </button>
-                <button
-                  onClick={downloadPDF}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-semibold"
-                >
-                  📄 PDF
-                </button>
-              </div>
+    <Layout title="Sales Reports">
+      {/* Date filter */}
+      <div className="card mb-5 animate-fade-up">
+        <div className="card-body">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="form-group">
+              <label className="form-label">From Date</label>
+              <input type="date" className="form-input" value={range.startDate} onChange={setD('startDate')} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">To Date</label>
+              <input type="date" className="form-input" value={range.endDate} onChange={setD('endDate')} />
+            </div>
+            <div className="flex gap-2 pb-0.5">
+              <button
+                onClick={() => setRange({
+                  startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
+                  endDate: today.toISOString().split('T')[0],
+                })}
+                className="btn btn-outline btn-sm"
+              >This Month</button>
+              <button
+                onClick={() => setRange({
+                  startDate: new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0],
+                  endDate: today.toISOString().split('T')[0],
+                })}
+                className="btn btn-outline btn-sm"
+              >This Year</button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-gray-600 text-sm font-semibold">Total Invoices</p>
-            <p className="text-3xl font-bold text-blue-600 mt-2">{totals.count}</p>
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        {[
+          { label: 'Total Invoices', value: totals.count, color: '#2563EB' },
+          { label: 'Taxable Value', value: fmt(totals.taxable), color: '#0C3D5E' },
+          { label: 'Sales Tax Collected', value: fmt(totals.tax), color: '#059669' },
+          { label: 'Grand Total', value: fmt(totals.amount), color: '#D97706' },
+        ].map((s, i) => (
+          <div key={s.label} className={`stat-card animate-fade-up anim-delay-${i + 1}`}>
+            <div className="stat-label">{s.label}</div>
+            <div className="stat-value" style={{ color: s.color, fontSize: i === 0 ? '2.25rem' : '1.25rem' }}>
+              {s.value}
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-gray-600 text-sm font-semibold">Taxable Value</p>
-            <p className="text-2xl font-bold text-gray-800 mt-2">
-              PKR {totals.totalTaxable.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-gray-600 text-sm font-semibold">Sales Tax (18%)</p>
-            <p className="text-2xl font-bold text-green-600 mt-2">
-              PKR {totals.totalTax.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-gray-600 text-sm font-semibold">Total Amount</p>
-            <p className="text-2xl font-bold text-purple-600 mt-2">
-              PKR {totals.totalAmount.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
+        ))}
+      </div>
+
+      {/* Invoice table */}
+      <div className="card animate-fade-up anim-delay-3">
+        <div className="card-header">
+          <span className="card-title">Invoice Details</span>
+          <span className="text-sm text-neutral-400">{invoices.length} invoices</span>
         </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-bold">Invoice Details</h2>
+        {loading ? (
+          <div className="p-6 space-y-3">{[1,2,3,4].map(i => <div key={i} className="skeleton h-11" />)}</div>
+        ) : invoices.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon-box">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+              </svg>
+            </div>
+            <div className="empty-title">No invoices in this period</div>
+            <div className="empty-desc">Adjust the date range to see results</div>
           </div>
-
-          {loading ? (
-            <div className="p-6 text-center">Loading...</div>
-          ) : invoices.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">No invoices in this period</div>
-          ) : (
+        ) : (
+          <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
+              <table className="data-table">
+                <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Invoice No</th>
-                    <th className="px-4 py-3 text-left font-semibold">Date</th>
-                    <th className="px-4 py-3 text-left font-semibold">Customer</th>
-                    <th className="px-4 py-3 text-right font-semibold">Taxable Value</th>
-                    <th className="px-4 py-3 text-right font-semibold">Tax Amount</th>
-                    <th className="px-4 py-3 text-right font-semibold">Total</th>
-                    <th className="px-4 py-3 text-center font-semibold">Status</th>
+                    <th>Invoice No</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th className="t-right">Taxable Value</th>
+                    <th className="t-right">Tax Amount</th>
+                    <th className="t-right">Total</th>
+                    <th className="t-center">FBR Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoices.map(inv => (
-                    <tr key={inv.id} className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-3 font-semibold text-blue-600">{inv.invoiceNumber}</td>
-                      <td className="px-4 py-3">{new Date(inv.invoiceDate).toLocaleDateString('en-PK')}</td>
-                      <td className="px-4 py-3">{inv.customer.businessName}</td>
-                      <td className="px-4 py-3 text-right">PKR {parseFloat(inv.totalTaxableValue).toLocaleString('en-PK', { maximumFractionDigits: 0 })}</td>
-                      <td className="px-4 py-3 text-right text-green-600 font-semibold">PKR {parseFloat(inv.totalSalesTax).toLocaleString('en-PK', { maximumFractionDigits: 0 })}</td>
-                      <td className="px-4 py-3 text-right font-bold">PKR {parseFloat(inv.totalInvoiceAmount).toLocaleString('en-PK', { maximumFractionDigits: 0 })}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          inv.fbrStatus === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
-                          inv.fbrStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {inv.fbrStatus || 'PENDING'}
-                        </span>
+                    <tr key={inv.id}>
+                      <td className="font-numeric text-xs font-semibold text-primary">{inv.invoiceNumber}</td>
+                      <td className="text-xs text-neutral-500">
+                        {new Date(inv.invoiceDate).toLocaleDateString('en-PK', { day:'2-digit', month:'short', year:'numeric' })}
                       </td>
+                      <td className="font-medium">{inv.customer?.businessName}</td>
+                      <td className="t-right font-numeric">{fmt(inv.totalTaxableValue)}</td>
+                      <td className="t-right font-numeric text-green-700 font-semibold">{fmt(inv.totalSalesTax)}</td>
+                      <td className="t-right font-numeric font-bold text-neutral-800">{fmt(inv.totalInvoiceAmount)}</td>
+                      <td className="t-center">{fbrBadge(inv.fbrStatus)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
 
-          <div className="border-t p-6 bg-gray-50">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-gray-600 text-sm">Total Taxable Value</p>
-                <p className="text-2xl font-bold text-gray-800">PKR {totals.totalTaxable.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</p>
-              </div>
-              <div>
-                <p className="text-gray-600 text-sm">Total Sales Tax (18%)</p>
-                <p className="text-2xl font-bold text-green-600">PKR {totals.totalTax.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</p>
-              </div>
-              <div>
-                <p className="text-gray-600 text-sm">Grand Total</p>
-                <p className="text-2xl font-bold text-blue-600">PKR {totals.totalAmount.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</p>
+            {/* Totals footer */}
+            <div className="border-t border-neutral-100 bg-neutral-50 px-4 py-4">
+              <div className="flex flex-wrap justify-end gap-8">
+                <div className="text-right">
+                  <div className="text-xs text-neutral-500 mb-0.5">Total Taxable</div>
+                  <div className="font-display font-bold text-neutral-800 font-numeric">{fmt(totals.taxable)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-neutral-500 mb-0.5">Total Sales Tax</div>
+                  <div className="font-display font-bold text-green-700 font-numeric">{fmt(totals.tax)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-neutral-500 mb-0.5">Grand Total</div>
+                  <div className="font-display font-bold text-primary font-numeric text-lg">{fmt(totals.amount)}</div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
-    </div>
+    </Layout>
   );
 }
