@@ -50,7 +50,9 @@ export default function SettingsPage() {
     contactPhone: '',
     contactEmail: '',
     businessType: 'MANUFACTURER',
+    logoBase64: '',
   });
+  const [logoPreview, setLogoPreview] = useState('');
 
   useEffect(() => {
     API.get('/auth/me').then(({ data }) => {
@@ -65,13 +67,33 @@ export default function SettingsPage() {
         contactPhone: c.contactPhone || '',
         contactEmail: c.contactEmail || '',
         businessType: c.businessType || 'MANUFACTURER',
+        logoBase64: c.logoBase64 || '',
       });
+      if (c.logoBase64) setLogoPreview(c.logoBase64);
       setFbrMode(c.fbrMode || 'sandbox');
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
   const set = (k) => (e) => setCompany(c => ({ ...c, [k]: e.target.value }));
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 1.5 * 1024 * 1024) { setError('Logo 1.5MB se chhota hona chahiye'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const b64 = ev.target.result;
+      setLogoPreview(b64);
+      setCompany(c => ({ ...c, logoBase64: b64 }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoPreview('');
+    setCompany(c => ({ ...c, logoBase64: '' }));
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -212,8 +234,40 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* FBR Settings */}
+        {/* Logo Upload */}
         <div className="card animate-fade-up anim-delay-1">
+          <div className="card-header">
+            <div>
+              <div className="card-title">Company Logo</div>
+              <div className="text-xs text-neutral-400 mt-0.5">PDF invoices mein appear hoga — PNG/JPG, max 1.5MB</div>
+            </div>
+            {logoPreview && <span className="badge badge-success">Logo set ✓</span>}
+          </div>
+          <div className="card-body">
+            <div className="flex items-center gap-6">
+              <div className="w-24 h-24 rounded-xl border-2 border-dashed border-neutral-200 flex items-center justify-center bg-neutral-50 overflow-hidden flex-shrink-0">
+                {logoPreview
+                  ? <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-1" />
+                  : <span className="text-xs text-neutral-400 text-center px-2">No logo</span>}
+              </div>
+              <div className="space-y-2">
+                <label className="btn btn-secondary btn-sm cursor-pointer">
+                  {logoPreview ? '↑ Change Logo' : '↑ Upload Logo'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoUpload} />
+                </label>
+                {logoPreview && (
+                  <button type="button" onClick={removeLogo} className="btn btn-ghost btn-sm text-danger ml-2">
+                    × Remove
+                  </button>
+                )}
+                <p className="text-xs text-neutral-400">Save Changes button se save hoga. White background automatically remove ho jaega PDF mein.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* FBR Settings */}
+        <div className="card animate-fade-up anim-delay-2">
           <div className="card-header">
             <div>
               <div className="card-title">FBR Integration</div>
@@ -268,7 +322,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Tax Rates Reference */}
-        <div className="card animate-fade-up anim-delay-2">
+        <div className="card animate-fade-up anim-delay-3">
           <div className="card-header">
             <div>
               <div className="card-title">Pakistan GST Rates</div>

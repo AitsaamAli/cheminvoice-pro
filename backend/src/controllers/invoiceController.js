@@ -104,41 +104,52 @@ const createInvoice = asyncHandler(async (req, res) => {
     referenceInvoiceIRN = originalInv?.fbrInvoiceNumber || null;
   }
 
-  const invoice = await prisma.invoice.create({
-    data: {
-      companyId,
-      customerId,
-      invoiceNumber,
-      invoiceDate: new Date(invoiceDate),
-      invoiceType,
-      referenceInvoiceNo: referenceInvoiceNo || null,
-      referenceInvoiceIRN,
-      sellerNtn: company.ntn || '',
-      sellerStrn: company.strn || '',
-      sellerBusinessName: company.businessName,
-      sellerAddress: company.address || '',
-      sellerProvince: company.province || '',
-      buyerRegistrationType: customer.registrationType,
-      buyerNtn: customer.ntn || null,
-      buyerCnic: customer.cnic || null,
-      buyerStrn: customer.strn || null,
-      buyerBusinessName: customer.businessName,
-      buyerAddress: customer.address || '',
-      buyerProvince: customer.province || '',
-      totalTaxableValue,
-      totalSalesTax,
-      totalFurtherTax,
-      totalInvoiceAmount,
-      status: 'DRAFT',
-      paymentMethod: paymentMethod || 'CASH',
-      paymentTerms: paymentTerms || null,
-      deliveryTerms: deliveryTerms || null,
-      remarks: remarks || null,
-      createdByUserId: req.user.id,
-      items: { create: invoiceItems },
-    },
-    include: { items: true },
-  });
+  // Stock deduction (trackStock products only) — run atomically with invoice create
+  const stockDeductions = invoiceItems
+    .filter(it => productsRaw.find(p => p.id === it.productId)?.trackStock)
+    .map(it => prisma.product.update({
+      where: { id: it.productId },
+      data: { stockQuantity: { decrement: it.quantity } },
+    }));
+
+  const [invoice] = await prisma.$transaction([
+    prisma.invoice.create({
+      data: {
+        companyId,
+        customerId,
+        invoiceNumber,
+        invoiceDate: new Date(invoiceDate),
+        invoiceType,
+        referenceInvoiceNo: referenceInvoiceNo || null,
+        referenceInvoiceIRN,
+        sellerNtn: company.ntn || '',
+        sellerStrn: company.strn || '',
+        sellerBusinessName: company.businessName,
+        sellerAddress: company.address || '',
+        sellerProvince: company.province || '',
+        buyerRegistrationType: customer.registrationType,
+        buyerNtn: customer.ntn || null,
+        buyerCnic: customer.cnic || null,
+        buyerStrn: customer.strn || null,
+        buyerBusinessName: customer.businessName,
+        buyerAddress: customer.address || '',
+        buyerProvince: customer.province || '',
+        totalTaxableValue,
+        totalSalesTax,
+        totalFurtherTax,
+        totalInvoiceAmount,
+        status: 'DRAFT',
+        paymentMethod: paymentMethod || 'CASH',
+        paymentTerms: paymentTerms || null,
+        deliveryTerms: deliveryTerms || null,
+        remarks: remarks || null,
+        createdByUserId: req.user.id,
+        items: { create: invoiceItems },
+      },
+      include: { items: true },
+    }),
+    ...stockDeductions,
+  ]);
 
   res.status(201).json({ success: true, message: 'Invoice created successfully', invoice });
 });
@@ -179,10 +190,19 @@ const cancelInvoice = asyncHandler(async (req, res) => {
 
   // Unsubmitted draft — can always cancel
   if (invoice.fbrStatus !== 'ACCEPTED') {
-    await prisma.invoice.update({
-      where: { id: invoiceId },
-      data: { status: 'CANCELLED', fbrStatus: 'CANCELLED' },
+    const invWithItems = await prisma.invoice.findUnique({
+      where: { id: invoiceId }, include: { items: { include: { product: true } } },
     });
+    const stockRestorations = (invWithItems?.items || [])
+      .filter(it => it.product?.trackStock)
+      .map(it => prisma.product.update({
+        where: { id: it.productId },
+        data: { stockQuantity: { increment: it.quantity } },
+      }));
+    await prisma.$transaction([
+      prisma.invoice.update({ where: { id: invoiceId }, data: { status: 'CANCELLED', fbrStatus: 'CANCELLED' } }),
+      ...stockRestorations,
+    ]);
     return res.json({ success: true, message: 'Invoice cancel ho gayi' });
   }
 

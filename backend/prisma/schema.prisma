@@ -25,27 +25,30 @@ model User {
 }
 
 model Company {
-  id                String   @id @default(cuid())
-  businessName      String
-  ntn               String
-  strn              String
-  address           String
-  province          String
-  city              String
-  postalCode        String?
-  contactPhone      String?
-  contactEmail      String?
-  fbrApiToken       String?
-  fbrMode           String   @default("sandbox")
-  businessType      String   @default("MANUFACTURER")
-  lastInvoiceNumber Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  businessName         String
+  ntn                  String
+  strn                 String
+  address              String
+  province             String
+  city                 String
+  postalCode           String?
+  contactPhone         String?
+  contactEmail         String?
+  fbrApiToken          String?
+  fbrMode              String   @default("sandbox")
+  businessType         String   @default("MANUFACTURER")
+  logoBase64           String?
+  lastInvoiceNumber    Int      @default(0)
+  lastQuotationNumber  Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  users     User[]
-  customers Customer[]
-  products  Product[]
-  invoices  Invoice[]
+  users      User[]
+  customers  Customer[]
+  products   Product[]
+  invoices   Invoice[]
+  quotations Quotation[]
   taxConfigs TaxConfig[]
 
   @@index([ntn])
@@ -69,7 +72,8 @@ model Customer {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  invoices Invoice[]
+  invoices   Invoice[]
+  quotations Quotation[]
 
   @@index([companyId])
 }
@@ -91,10 +95,14 @@ model Product {
   sroScheduleNo    String?
   sroItemSerialNo  String?
   isActive         Boolean  @default(true)
+  trackStock       Boolean  @default(false)
+  stockQuantity    Float    @default(0)
+  reorderLevel     Float    @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  invoiceItems InvoiceItem[]
+  invoiceItems   InvoiceItem[]
+  quotationItems QuotationItem[]
 
   @@index([companyId])
 }
@@ -258,4 +266,48 @@ model LoginCode {
 
   @@index([email])
   @@index([code])
+}
+
+model Quotation {
+  id                   String    @id @default(cuid())
+  companyId            String
+  company              Company   @relation(fields: [companyId], references: [id])
+  customerId           String
+  customer             Customer  @relation(fields: [customerId], references: [id])
+  quotationNumber      String    @unique
+  quotationDate        DateTime
+  validUntil           DateTime?
+  status               String    @default("DRAFT")
+  totalTaxableValue    Float     @default(0)
+  totalSalesTax        Float     @default(0)
+  totalAmount          Float     @default(0)
+  notes                String?
+  convertedToInvoiceId String?
+  createdByUserId      String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  items QuotationItem[]
+
+  @@index([companyId])
+  @@index([customerId])
+}
+
+model QuotationItem {
+  id                 String    @id @default(cuid())
+  quotationId        String
+  quotation          Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product   @relation(fields: [productId], references: [id])
+  productDescription String
+  quantity           Float
+  unitPrice          Float
+  discountAmount     Float     @default(0)
+  taxRate            Float     @default(18)
+  taxableValue       Float
+  taxAmount          Float
+  totalAmount        Float
+  createdAt          DateTime  @default(now())
+
+  @@index([quotationId])
 }

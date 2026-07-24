@@ -7,7 +7,8 @@ const createProduct = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
   // companyId verified by requireCompanyAccess middleware
   const { productName, productCode, hsCode, description, unitOfMeasure, defaultSalePrice, defaultTaxRate,
-          isService, isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo } = req.body;
+          isService, isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo,
+          trackStock, stockQuantity, reorderLevel } = req.body;
 
   const product = await prisma.product.create({
     data: {
@@ -23,6 +24,9 @@ const createProduct = asyncHandler(async (req, res) => {
       mrp: isThirdSchedule && mrp ? parseFloat(mrp) : null,
       sroScheduleNo: sroScheduleNo || null,
       sroItemSerialNo: sroItemSerialNo || null,
+      trackStock: trackStock || false,
+      stockQuantity: trackStock ? (parseFloat(stockQuantity) || 0) : 0,
+      reorderLevel: trackStock ? (parseFloat(reorderLevel) || 0) : 0,
       companyId,
     },
   });
@@ -69,7 +73,8 @@ const updateProduct = asyncHandler(async (req, res) => {
   if (existing.companyId !== req.user.companyId) throw new AppError('Access denied', 403);
 
   const { productName, productCode, hsCode, description, unitOfMeasure, defaultSalePrice, defaultTaxRate,
-          isService, isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo } = req.body;
+          isService, isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo,
+          trackStock, stockQuantity, reorderLevel } = req.body;
 
   const product = await prisma.product.update({
     where: { id: productId },
@@ -86,6 +91,9 @@ const updateProduct = asyncHandler(async (req, res) => {
       mrp: isThirdSchedule && mrp ? parseFloat(mrp) : null,
       sroScheduleNo: sroScheduleNo || null,
       sroItemSerialNo: sroItemSerialNo || null,
+      trackStock: trackStock !== undefined ? (trackStock || false) : existing.trackStock,
+      stockQuantity: trackStock !== undefined ? (parseFloat(stockQuantity) || 0) : existing.stockQuantity,
+      reorderLevel: trackStock !== undefined ? (parseFloat(reorderLevel) || 0) : existing.reorderLevel,
     },
   });
 

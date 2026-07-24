@@ -67,6 +67,9 @@ const schemas = {
     mrp: Joi.number().min(0).max(99999999).precision(2).optional().allow(null),
     sroScheduleNo: Joi.string().max(100).optional().allow('', null),
     sroItemSerialNo: Joi.string().max(50).optional().allow('', null),
+    trackStock: Joi.boolean().optional().default(false),
+    stockQuantity: Joi.number().min(0).max(9999999).precision(4).optional().default(0),
+    reorderLevel: Joi.number().min(0).max(9999999).precision(4).optional().default(0),
   }),
 
   updatePayment: Joi.object({
@@ -91,6 +94,23 @@ const schemas = {
       'MEDICAL','CONSTRUCTION','IT_FREELANCER','AGRICULTURE','AUTO_WORKSHOP',
       'IMPORT_EXPORT','EDUCATION'
     ).optional(),
+    logoBase64: Joi.string().max(2000000).optional().allow('', null),
+  }),
+
+  createQuotation: Joi.object({
+    customerId: Joi.string().max(50).required(),
+    quotationDate: Joi.date().required(),
+    validUntil: Joi.date().optional().allow(null),
+    notes: Joi.string().max(1000).optional().allow(''),
+    items: Joi.array().items(
+      Joi.object({
+        productId: Joi.string().max(50).required(),
+        quantity: Joi.number().positive().max(999999).precision(4).required(),
+        unitPrice: Joi.number().min(0).max(99999999).precision(4).required(),
+        discountAmount: Joi.number().min(0).max(99999999).precision(4).optional().default(0),
+        taxRate: Joi.number().valid(0, 5, 10, 18).required(),
+      })
+    ).min(1).max(100).required(),
   }),
 
   createInvoice: Joi.object({

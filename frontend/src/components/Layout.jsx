@@ -33,6 +33,14 @@ const IcReports = () => (
     <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
   </svg>
 );
+const IcQuote = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <path d="M9 13h6"/><path d="M9 17h4"/>
+    <circle cx="9" cy="9" r="1" fill="currentColor"/>
+  </svg>
+);
 const IcSettings = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3"/>
@@ -68,6 +76,7 @@ const LogoAtom = () => (
 const NAV = [
   { path: '/', label: 'Dashboard', Icon: IcDash, exact: true },
   { path: '/invoices/create', label: 'New Invoice', Icon: IcInvoice },
+  { path: '/quotations', label: 'Quotations', Icon: IcQuote },
   { path: '/customers', label: 'Customers', Icon: IcCustomers },
   { path: '/products', label: 'Products', Icon: IcProducts },
   { path: '/reports', label: 'Reports', Icon: IcReports },

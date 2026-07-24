@@ -58,6 +58,60 @@ async function runMigrations(prisma) {
     ALTER TABLE "Invoice"
       ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT DEFAULT 'CASH'
   `);
+
+  // Phase 6 — Company logo + last quotation counter
+  await runPhase(prisma, 'company-logo', `
+    ALTER TABLE "Company"
+      ADD COLUMN IF NOT EXISTS "logoBase64"          TEXT,
+      ADD COLUMN IF NOT EXISTS "lastQuotationNumber" INTEGER NOT NULL DEFAULT 0
+  `);
+
+  // Phase 7 — Product stock tracking
+  await runPhase(prisma, 'product-stock', `
+    ALTER TABLE "Product"
+      ADD COLUMN IF NOT EXISTS "trackStock"    BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "stockQuantity" DOUBLE PRECISION NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "reorderLevel"  DOUBLE PRECISION NOT NULL DEFAULT 0
+  `);
+
+  // Phase 8 — Quotations table
+  await runPhase(prisma, 'quotations-table', `
+    CREATE TABLE IF NOT EXISTS "Quotation" (
+      "id"                   TEXT NOT NULL PRIMARY KEY,
+      "companyId"            TEXT NOT NULL,
+      "customerId"           TEXT NOT NULL,
+      "quotationNumber"      TEXT NOT NULL UNIQUE,
+      "quotationDate"        TIMESTAMP(3) NOT NULL,
+      "validUntil"           TIMESTAMP(3),
+      "status"               TEXT NOT NULL DEFAULT 'DRAFT',
+      "totalTaxableValue"    DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "totalSalesTax"        DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "totalAmount"          DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "notes"                TEXT,
+      "convertedToInvoiceId" TEXT,
+      "createdByUserId"      TEXT NOT NULL,
+      "createdAt"            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Phase 9 — QuotationItems table
+  await runPhase(prisma, 'quotation-items-table', `
+    CREATE TABLE IF NOT EXISTS "QuotationItem" (
+      "id"                 TEXT NOT NULL PRIMARY KEY,
+      "quotationId"        TEXT NOT NULL,
+      "productId"          TEXT NOT NULL,
+      "productDescription" TEXT NOT NULL,
+      "quantity"           DOUBLE PRECISION NOT NULL,
+      "unitPrice"          DOUBLE PRECISION NOT NULL,
+      "discountAmount"     DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "taxRate"            DOUBLE PRECISION NOT NULL DEFAULT 18,
+      "taxableValue"       DOUBLE PRECISION NOT NULL,
+      "taxAmount"          DOUBLE PRECISION NOT NULL,
+      "totalAmount"        DOUBLE PRECISION NOT NULL,
+      "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 }
 
 module.exports = { runMigrations };

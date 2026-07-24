@@ -26,6 +26,7 @@ const EMPTY = {
   productName: '', productCode: '', hsCode: '', description: '',
   unitOfMeasure: 'KGM', defaultSalePrice: '', defaultTaxRate: 18,
   isService: false, isThirdSchedule: false, mrp: '', sroScheduleNo: '', sroItemSerialNo: '',
+  trackStock: false, stockQuantity: '', reorderLevel: '',
 };
 
 const IcPlus = () => (
@@ -107,6 +108,9 @@ export default function ProductsPage() {
       mrp: p.mrp || '',
       sroScheduleNo: p.sroScheduleNo || '',
       sroItemSerialNo: p.sroItemSerialNo || '',
+      trackStock: p.trackStock || false,
+      stockQuantity: p.stockQuantity ?? '',
+      reorderLevel: p.reorderLevel ?? '',
     });
     setEditId(p.id); setFormError(''); setModalOpen(true);
   };
@@ -131,6 +135,9 @@ export default function ProductsPage() {
       mrp: form.isThirdSchedule && form.mrp ? parseFloat(form.mrp) : null,
       sroScheduleNo: form.sroScheduleNo || null,
       sroItemSerialNo: form.sroItemSerialNo || null,
+      trackStock: form.trackStock || false,
+      stockQuantity: form.trackStock ? (parseFloat(form.stockQuantity) || 0) : 0,
+      reorderLevel: form.trackStock ? (parseFloat(form.reorderLevel) || 0) : 0,
     };
 
     try {
@@ -224,8 +231,11 @@ export default function ProductsPage() {
                       <div className="font-semibold text-neutral-800">{p.productName}
                         {p.isService && <span className="ml-2 badge badge-warning text-xs">Service</span>}
                         {p.isThirdSchedule && <span className="ml-2 badge badge-primary text-xs">3rd Sch.</span>}
+                        {p.trackStock && p.reorderLevel > 0 && p.stockQuantity <= p.reorderLevel &&
+                          <span className="ml-2 badge badge-danger text-xs">⚠ Low Stock</span>}
                       </div>
                       {p.description && <div className="text-xs text-neutral-400 mt-0.5 truncate max-w-xs">{p.description}</div>}
+                      {p.trackStock && <div className="text-xs text-neutral-500 mt-0.5">Stock: {parseFloat(p.stockQuantity||0).toLocaleString('en-PK')} {p.unitOfMeasure}</div>}
                     </td>
                     <td>
                       <span className="font-numeric text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">
@@ -390,6 +400,36 @@ export default function ProductsPage() {
                       value={form.sroItemSerialNo} onChange={set('sroItemSerialNo')} />
                   </div>
                 </div>
+
+                {/* Stock Tracking */}
+                {!form.isService && (
+                <div className="form-group">
+                  <div className="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
+                    style={{ borderColor: form.trackStock ? '#059669' : '#E5E7EB', background: form.trackStock ? '#ECFDF5' : '' }}
+                    onClick={() => setForm(f => ({ ...f, trackStock: !f.trackStock }))}>
+                    <input type="checkbox" checked={form.trackStock} onChange={() => {}} className="w-4 h-4 accent-green-600 pointer-events-none" />
+                    <div>
+                      <div className="text-sm font-semibold text-neutral-800">📦 Track Stock / Inventory</div>
+                      <div className="text-xs text-neutral-500 mt-0.5">Invoice create hone par stock automatically deduct hoga</div>
+                    </div>
+                  </div>
+                  {form.trackStock && (
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div className="form-group">
+                        <label className="form-label req">Current Stock (Qty)</label>
+                        <input type="number" min="0" step="0.001" className="form-input font-numeric"
+                          placeholder="0" value={form.stockQuantity} onChange={set('stockQuantity')} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Reorder Level</label>
+                        <input type="number" min="0" step="0.001" className="form-input font-numeric"
+                          placeholder="Low-stock alert threshold"
+                          value={form.reorderLevel} onChange={set('reorderLevel')} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
