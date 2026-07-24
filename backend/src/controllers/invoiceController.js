@@ -9,7 +9,7 @@ const MAX_TAKE = 50;
 // ── Create invoice ───────────────────────────────────────────────────────────
 const createInvoice = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
-  const { customerId, invoiceDate, invoiceType, items, paymentTerms, deliveryTerms, remarks, referenceInvoiceNo } = req.body;
+  const { customerId, invoiceDate, invoiceType, items, paymentTerms, paymentMethod, deliveryTerms, remarks, referenceInvoiceNo } = req.body;
 
   // ✅ FIX: N+1 — fetch all products in ONE query instead of one per item
   const productIds = [...new Set(items.map(i => i.productId))];
@@ -47,9 +47,10 @@ const createInvoice = asyncHandler(async (req, res) => {
     // Third Schedule: tax is on MRP not transaction value
     const fixedNotifiedValueOrRetailPrice = product.isThirdSchedule ? (product.mrp || null) : null;
 
-    // Determine saleType: if Third Schedule product → "Third Schedule", else from item/default
+    // Determine saleType: if Third Schedule → "Third Schedule", if service → "Services", else item/default
     let saleType = item.saleType || 'Goods';
     if (product.isThirdSchedule) saleType = 'Third Schedule';
+    else if (product.isService) saleType = 'Services';
     else if (taxRate === 0 && saleType === 'Goods') saleType = 'Zero-Rated';
 
     return {
@@ -129,6 +130,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       totalFurtherTax,
       totalInvoiceAmount,
       status: 'DRAFT',
+      paymentMethod: paymentMethod || 'CASH',
       paymentTerms: paymentTerms || null,
       deliveryTerms: deliveryTerms || null,
       remarks: remarks || null,
@@ -264,13 +266,14 @@ const generatePDF = asyncHandler(async (req, res) => {
 // ── List invoices ────────────────────────────────────────────────────────────
 const listInvoices = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
-  const { status, startDate, endDate } = req.query;
+  const { status, startDate, endDate, customerId: filterCustomerId } = req.query;
   // ✅ FIX: clamp take
   const skip = Math.max(0, parseInt(req.query.skip) || 0);
   const take = Math.min(MAX_TAKE, Math.max(1, parseInt(req.query.take) || 20));
 
   const where = { companyId };
   if (status) where.status = status;
+  if (filterCustomerId) where.customerId = filterCustomerId;
   if (startDate || endDate) {
     where.invoiceDate = {};
     if (startDate) where.invoiceDate.gte = new Date(startDate);

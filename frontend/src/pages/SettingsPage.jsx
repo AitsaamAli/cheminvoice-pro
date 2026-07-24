@@ -4,6 +4,21 @@ import Layout from '../components/Layout';
 
 const PROVINCES = ['Punjab', 'Sindh', 'KPK', 'Balochistan', 'Islamabad', 'AJK', 'Gilgit-Baltistan'];
 
+const BUSINESS_TYPES = [
+  { value: 'MANUFACTURER',    label: '🏭 Manufacturer',           desc: 'Production & assembly' },
+  { value: 'TRADER',          label: '🛒 Trader / Distributor',   desc: 'Buy & sell goods' },
+  { value: 'SERVICE_PROVIDER',label: '💼 Service Provider',       desc: 'Consulting, agency, etc.' },
+  { value: 'RETAILER',        label: '🏪 Retailer / Shop',        desc: 'Walk-in customers' },
+  { value: 'RESTAURANT',      label: '🍽️ Restaurant / Food',     desc: 'Food & beverage' },
+  { value: 'MEDICAL',         label: '💊 Medical / Pharmacy',     desc: 'Healthcare products' },
+  { value: 'CONSTRUCTION',    label: '🏗️ Construction',          desc: 'Civil & infrastructure' },
+  { value: 'IT_FREELANCER',   label: '💻 IT / Freelancer',        desc: 'Software, design, digital' },
+  { value: 'AGRICULTURE',     label: '🌾 Agriculture',            desc: 'Farm & agri products' },
+  { value: 'AUTO_WORKSHOP',   label: '🚗 Auto / Workshop',        desc: 'Vehicles & repairs' },
+  { value: 'IMPORT_EXPORT',   label: '📦 Import / Export',        desc: 'International trade' },
+  { value: 'EDUCATION',       label: '🏫 Education / NGO',        desc: 'Training & non-profit' },
+];
+
 const Spinner = () => (
   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -34,6 +49,7 @@ export default function SettingsPage() {
     city: '',
     contactPhone: '',
     contactEmail: '',
+    businessType: 'MANUFACTURER',
   });
 
   useEffect(() => {
@@ -48,6 +64,7 @@ export default function SettingsPage() {
         city: c.city || '',
         contactPhone: c.contactPhone || '',
         contactEmail: c.contactEmail || '',
+        businessType: c.businessType || 'MANUFACTURER',
       });
       setFbrMode(c.fbrMode || 'sandbox');
     }).catch(console.error)
@@ -102,6 +119,34 @@ export default function SettingsPage() {
           </div>
           <div className="card-body">
             <form onSubmit={handleSave} className="space-y-4">
+              {/* Business Type */}
+              <div className="form-group">
+                <label className="form-label req">Business Type</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
+                  {BUSINESS_TYPES.map(bt => (
+                    <label
+                      key={bt.value}
+                      className={`flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                        company.businessType === bt.value
+                          ? 'border-primary bg-blue-50 ring-1 ring-primary'
+                          : 'border-neutral-200 hover:border-neutral-300'
+                      }`}
+                    >
+                      <input
+                        type="radio" name="businessType" value={bt.value}
+                        checked={company.businessType === bt.value}
+                        onChange={set('businessType')}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <div className="text-xs font-semibold text-neutral-800">{bt.label}</div>
+                        <div className="text-xs text-neutral-400">{bt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="form-group">
                 <label className="form-label req">Business Name</label>
                 <input type="text" className="form-input" value={company.businessName} onChange={set('businessName')} placeholder="Registered business name" required />

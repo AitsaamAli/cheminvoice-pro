@@ -7,13 +7,14 @@ const createProduct = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
   // companyId verified by requireCompanyAccess middleware
   const { productName, productCode, hsCode, description, unitOfMeasure, defaultSalePrice, defaultTaxRate,
-          isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo } = req.body;
+          isService, isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo } = req.body;
 
   const product = await prisma.product.create({
     data: {
       productName,
       productCode,
-      hsCode,
+      isService: isService || false,
+      hsCode: isService ? '' : (hsCode || ''),
       description: description || null,
       unitOfMeasure,
       defaultSalePrice,
@@ -68,14 +69,15 @@ const updateProduct = asyncHandler(async (req, res) => {
   if (existing.companyId !== req.user.companyId) throw new AppError('Access denied', 403);
 
   const { productName, productCode, hsCode, description, unitOfMeasure, defaultSalePrice, defaultTaxRate,
-          isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo } = req.body;
+          isService, isThirdSchedule, mrp, sroScheduleNo, sroItemSerialNo } = req.body;
 
   const product = await prisma.product.update({
     where: { id: productId },
     data: {
       productName,
       productCode,
-      hsCode,
+      isService: isService || false,
+      hsCode: isService ? '' : (hsCode || ''),
       description: description || null,
       unitOfMeasure,
       defaultSalePrice,

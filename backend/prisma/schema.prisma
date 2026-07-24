@@ -37,6 +37,7 @@ model Company {
   contactEmail      String?
   fbrApiToken       String?
   fbrMode           String   @default("sandbox")
+  businessType      String   @default("MANUFACTURER")
   lastInvoiceNumber Int      @default(0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -79,7 +80,8 @@ model Product {
   company          Company  @relation(fields: [companyId], references: [id])
   productName      String
   productCode      String
-  hsCode           String
+  hsCode           String   @default("")
+  isService        Boolean  @default(false)
   description      String?
   unitOfMeasure    String
   defaultSalePrice Float
@@ -129,6 +131,7 @@ model Invoice {
   totalInvoiceAmount    Float
   amountInWords         String?
 
+  paymentMethod         String?  @default("CASH")
   status                String   @default("DRAFT")
   paymentStatus         String   @default("UNPAID")  // UNPAID, PARTIAL, PAID
   paidAmount            Float    @default(0)

@@ -40,6 +40,7 @@ export default function ReportsPage() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'aging'
   const today = new Date();
   const [range, setRange] = useState({
     startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
@@ -96,6 +97,24 @@ export default function ReportsPage() {
 
   const acceptedCount = invoices.filter(i => i.fbrStatus === 'ACCEPTED').length;
   const filename = `invoices_${range.startDate}_to_${range.endDate}.csv`;
+
+  // Aging report: unpaid invoices grouped by how overdue they are
+  const nowMs = Date.now();
+  const agingBuckets = [
+    { label: 'Current (0–30 days)', min: 0, max: 30, color: '#059669', items: [] },
+    { label: '31–60 days', min: 31, max: 60, color: '#D97706', items: [] },
+    { label: '61–90 days', min: 61, max: 90, color: '#EA580C', items: [] },
+    { label: '90+ days', min: 91, max: Infinity, color: '#DC2626', items: [] },
+  ];
+  invoices
+    .filter(i => i.paymentStatus !== 'PAID' && i.status !== 'CANCELLED')
+    .forEach(inv => {
+      const agedays = Math.floor((nowMs - new Date(inv.invoiceDate).getTime()) / 86400000);
+      const bal = parseFloat(inv.totalInvoiceAmount || 0) - parseFloat(inv.paidAmount || 0);
+      const bucket = agingBuckets.find(b => agedays >= b.min && agedays <= b.max);
+      if (bucket) bucket.items.push({ ...inv, agedays, balance: bal });
+    });
+  const agingTotal = agingBuckets.reduce((s, b) => s + b.items.reduce((ss, i) => ss + i.balance, 0), 0);
 
   return (
     <Layout title="Sales Reports">
@@ -193,7 +212,113 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          className={`btn btn-sm ${activeTab === 'invoices' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setActiveTab('invoices')}
+        >
+          Invoice Details
+        </button>
+        <button
+          className={`btn btn-sm ${activeTab === 'aging' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setActiveTab('aging')}
+        >
+          Aging Report
+          {agingTotal > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-bold" style={{ background: '#DC2626', color: '#fff' }}>
+              {agingBuckets.reduce((s,b)=>s+b.items.length,0)}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Aging Report Tab */}
+      {activeTab === 'aging' && (
+        <div className="space-y-4 animate-fade-up">
+          {/* Aging summary cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {agingBuckets.map((b, i) => (
+              <div key={i} className="stat-card">
+                <div className="stat-label">{b.label}</div>
+                <div className="stat-value" style={{ color: b.color, fontSize: '1rem' }}>
+                  {fmt(b.items.reduce((s,i)=>s+i.balance,0))}
+                </div>
+                <div className="stat-sub">{b.items.length} invoice(s)</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Aging detail per bucket */}
+          {agingBuckets.map((bucket, bi) => bucket.items.length > 0 && (
+            <div key={bi} className="card">
+              <div className="card-header">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ background: bucket.color }}></div>
+                  <span className="card-title">{bucket.label}</span>
+                </div>
+                <span className="text-sm font-numeric font-semibold" style={{ color: bucket.color }}>
+                  {fmt(bucket.items.reduce((s,i)=>s+i.balance,0))}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice No</th>
+                      <th>Customer</th>
+                      <th>Date</th>
+                      <th className="t-center">Age (days)</th>
+                      <th className="t-right">Total</th>
+                      <th className="t-right">Paid</th>
+                      <th className="t-right">Balance</th>
+                      <th className="t-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bucket.items.sort((a,b) => b.agedays - a.agedays).map(inv => (
+                      <tr key={inv.id}>
+                        <td className="font-numeric text-xs font-semibold text-primary">{inv.invoiceNumber}</td>
+                        <td className="font-medium">{inv.customer?.businessName}</td>
+                        <td className="text-xs text-neutral-500">
+                          {new Date(inv.invoiceDate).toLocaleDateString('en-PK', {day:'2-digit',month:'short',year:'numeric'})}
+                        </td>
+                        <td className="t-center">
+                          <span className="font-numeric font-bold text-sm" style={{ color: bucket.color }}>{inv.agedays}</span>
+                        </td>
+                        <td className="t-right font-numeric text-sm">{fmtN(inv.totalInvoiceAmount)}</td>
+                        <td className="t-right font-numeric text-sm text-green-700">{fmtN(inv.paidAmount || 0)}</td>
+                        <td className="t-right font-numeric font-bold text-sm" style={{ color: bucket.color }}>
+                          {fmtN(inv.balance)}
+                        </td>
+                        <td className="t-center">{payBadge(inv.paymentStatus)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+
+          {agingTotal === 0 && (
+            <div className="card">
+              <div className="empty-state">
+                <div className="empty-icon-box">
+                  <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                </div>
+                <div className="empty-title" style={{ color: '#059669' }}>All Caught Up!</div>
+                <div className="empty-desc">Is period mein koi outstanding invoice nahi hai</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Invoice table */}
+      {activeTab === 'invoices' && (
       <div className="card animate-fade-up anim-delay-3">
         <div className="card-header">
           <span className="card-title">Invoice Details</span>
@@ -268,6 +393,7 @@ export default function ReportsPage() {
           </>
         )}
       </div>
+      )}
     </Layout>
   );
 }

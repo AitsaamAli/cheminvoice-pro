@@ -11,6 +11,7 @@ import SettingsPage from './pages/SettingsPage';
 import ReportsPage from './pages/ReportsPage';
 import CustomerPortalLogin from './pages/CustomerPortalLogin';
 import CustomerDashboard from './pages/CustomerDashboard';
+import CustomerLedgerPage from './pages/CustomerLedgerPage';
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -115,6 +116,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/:customerId/ledger"
+          element={
+            <ProtectedRoute>
+              <CustomerLedgerPage />
             </ProtectedRoute>
           }
         />

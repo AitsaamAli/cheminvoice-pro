@@ -64,8 +64,9 @@ export default function InvoiceForm() {
       invoiceType: 'NORMAL_SALES_TAX_INVOICE',
       referenceInvoiceNo: '',
       items: [{ ...EMPTY_ITEM }],
-      paymentTerms: 'Net 30',
-      deliveryTerms: 'FOB',
+      paymentMethod: 'CASH',
+      paymentTerms: '',
+      deliveryTerms: '',
       remarks: '',
     };
   });
@@ -110,6 +111,7 @@ export default function InvoiceForm() {
       const items = [...v.items];
       const taxRate = prod ? prod.defaultTaxRate : 18;
       const saleType = prod?.isThirdSchedule ? 'Third Schedule'
+        : prod?.isService ? 'Services'
         : taxRate === 0 ? 'Zero-Rated' : 'Goods';
       items[idx] = {
         ...items[idx],
@@ -434,16 +436,35 @@ export default function InvoiceForm() {
             <div className="card-header"><span className="card-title">Terms & Remarks</span></div>
             <div className="card-body space-y-4">
               <div className="form-group">
+                <label className="form-label">Payment Method</label>
+                <select className="form-select" value={invoice.paymentMethod} onChange={set('paymentMethod')}>
+                  <option value="CASH">💵 Cash</option>
+                  <option value="BANK_TRANSFER">🏦 Bank Transfer</option>
+                  <option value="CHEQUE">📝 Cheque</option>
+                  <option value="ONLINE">💳 Online / Card</option>
+                  <option value="CREDIT">📋 Credit (Pay Later)</option>
+                </select>
+              </div>
+              <div className="form-group">
                 <label className="form-label">Payment Terms</label>
-                <input type="text" className="form-input" value={invoice.paymentTerms} onChange={set('paymentTerms')} placeholder="e.g. Net 30" />
+                <select className="form-select" value={invoice.paymentTerms} onChange={set('paymentTerms')}>
+                  <option value="">— Select —</option>
+                  <option value="COD">COD (Cash on Delivery)</option>
+                  <option value="Advance">Advance Payment</option>
+                  <option value="Net 7">Net 7 Days</option>
+                  <option value="Net 15">Net 15 Days</option>
+                  <option value="Net 30">Net 30 Days</option>
+                  <option value="Net 60">Net 60 Days</option>
+                  <option value="Net 90">Net 90 Days</option>
+                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Delivery Terms</label>
                 <input type="text" className="form-input" value={invoice.deliveryTerms} onChange={set('deliveryTerms')} placeholder="e.g. FOB Karachi" />
               </div>
               <div className="form-group">
-                <label className="form-label">Remarks</label>
-                <input type="text" className="form-input" value={invoice.remarks} onChange={set('remarks')} placeholder="Optional notes" />
+                <label className="form-label">Notes / Remarks</label>
+                <textarea className="form-input" rows={3} value={invoice.remarks} onChange={set('remarks')} placeholder="Any additional notes for this invoice..." style={{ resize: 'none' }} />
               </div>
             </div>
           </div>

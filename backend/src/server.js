@@ -135,7 +135,7 @@ app.put(
   async (req, res, next) => {
     try {
       const { companyId } = req.params;
-      const { businessName, ntn, strn, address, province, city, contactPhone, contactEmail } = req.body;
+      const { businessName, ntn, strn, address, province, city, contactPhone, contactEmail, businessType } = req.body;
       const { asyncHandler: _, AppError: AE } = require('./middleware/errorHandler');
       const prisma = require('./lib/prisma');
       const company = await prisma.company.update({
@@ -149,6 +149,7 @@ app.put(
           city: city || undefined,
           contactPhone: contactPhone || null,
           contactEmail: contactEmail || null,
+          businessType: businessType || undefined,
         },
       });
       res.json({ success: true, company });

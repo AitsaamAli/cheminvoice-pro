@@ -43,6 +43,21 @@ async function runMigrations(prisma) {
       ADD COLUMN IF NOT EXISTS "sroScheduleNo"                   TEXT,
       ADD COLUMN IF NOT EXISTS "sroItemSerialNo"                 TEXT
   `);
+
+  // Phase 5 — Universal business: businessType, isService, paymentMethod
+  await runPhase(prisma, 'universal-business', `
+    ALTER TABLE "Company"
+      ADD COLUMN IF NOT EXISTS "businessType" TEXT NOT NULL DEFAULT 'MANUFACTURER'
+  `);
+  await runPhase(prisma, 'product-service', `
+    ALTER TABLE "Product"
+      ADD COLUMN IF NOT EXISTS "isService" BOOLEAN NOT NULL DEFAULT false,
+      ALTER COLUMN "hsCode" SET DEFAULT ''
+  `);
+  await runPhase(prisma, 'invoice-payment-method', `
+    ALTER TABLE "Invoice"
+      ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT DEFAULT 'CASH'
+  `);
 }
 
 module.exports = { runMigrations };

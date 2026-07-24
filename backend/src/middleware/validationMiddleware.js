@@ -52,10 +52,15 @@ const schemas = {
   createProduct: Joi.object({
     productName: Joi.string().max(MAX.name).required(),
     productCode: Joi.string().max(MAX.code).required(),
-    hsCode: Joi.string().min(4).max(8).pattern(/^[0-9]+$/).required()
-      .messages({ 'string.pattern.base': 'HS Code must be numbers only (4-8 digits)' }),
+    isService: Joi.boolean().optional().default(false),
+    hsCode: Joi.when('isService', {
+      is: true,
+      then: Joi.string().max(8).optional().allow('', null).default(''),
+      otherwise: Joi.string().min(4).max(8).pattern(/^[0-9]+$/).required()
+        .messages({ 'string.pattern.base': 'HS Code must be numbers only (4-8 digits)' }),
+    }),
     description: Joi.string().max(500).optional().allow(''),
-    unitOfMeasure: Joi.string().valid('KGM', 'LTR', 'TNE', 'DRM', 'BAG', 'NUM').required(),
+    unitOfMeasure: Joi.string().valid('KGM', 'LTR', 'TNE', 'DRM', 'BAG', 'NUM', 'HRS', 'DAY', 'MON', 'PCS').required(),
     defaultSalePrice: Joi.number().min(0).max(99999999).precision(4).required(),
     defaultTaxRate: Joi.number().valid(0, 5, 10, 18).required(),
     isThirdSchedule: Joi.boolean().optional().default(false),
@@ -81,6 +86,11 @@ const schemas = {
     contactPhone: Joi.string().max(20).optional().allow(''),
     contactEmail: Joi.string().email().max(MAX.email).optional().allow('')
       .messages({ 'string.email': 'Valid email required' }),
+    businessType: Joi.string().valid(
+      'MANUFACTURER','TRADER','SERVICE_PROVIDER','RETAILER','RESTAURANT',
+      'MEDICAL','CONSTRUCTION','IT_FREELANCER','AGRICULTURE','AUTO_WORKSHOP',
+      'IMPORT_EXPORT','EDUCATION'
+    ).optional(),
   }),
 
   createInvoice: Joi.object({
@@ -105,6 +115,7 @@ const schemas = {
       })
     ).min(1).max(100).required(),
     paymentTerms: Joi.string().max(200).optional().allow(''),
+    paymentMethod: Joi.string().valid('CASH', 'BANK_TRANSFER', 'CHEQUE', 'ONLINE', 'CREDIT').optional().default('CASH'),
     deliveryTerms: Joi.string().max(200).optional().allow(''),
     remarks: Joi.string().max(MAX.remarks).optional().allow(''),
   }),

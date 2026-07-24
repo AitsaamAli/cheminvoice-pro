@@ -8,7 +8,11 @@ const UNITS = [
   { value: 'TNE', label: 'TNE — Tonne' },
   { value: 'DRM', label: 'DRM — Drum' },
   { value: 'BAG', label: 'BAG — Bag' },
-  { value: 'NUM', label: 'NUM — Number' },
+  { value: 'NUM', label: 'NUM — Number / Pieces' },
+  { value: 'HRS', label: 'HRS — Hours (Services)' },
+  { value: 'DAY', label: 'DAY — Days (Services)' },
+  { value: 'MON', label: 'MON — Months (Services)' },
+  { value: 'PCS', label: 'PCS — Pieces' },
 ];
 
 const TAX_RATES = [
@@ -21,7 +25,7 @@ const TAX_RATES = [
 const EMPTY = {
   productName: '', productCode: '', hsCode: '', description: '',
   unitOfMeasure: 'KGM', defaultSalePrice: '', defaultTaxRate: 18,
-  isThirdSchedule: false, mrp: '', sroScheduleNo: '', sroItemSerialNo: '',
+  isService: false, isThirdSchedule: false, mrp: '', sroScheduleNo: '', sroItemSerialNo: '',
 };
 
 const IcPlus = () => (
@@ -98,6 +102,7 @@ export default function ProductsPage() {
       unitOfMeasure: p.unitOfMeasure || 'KGM',
       defaultSalePrice: p.defaultSalePrice || '',
       defaultTaxRate: p.defaultTaxRate ?? 18,
+      isService: p.isService || false,
       isThirdSchedule: p.isThirdSchedule || false,
       mrp: p.mrp || '',
       sroScheduleNo: p.sroScheduleNo || '',
@@ -116,12 +121,13 @@ export default function ProductsPage() {
     const payload = {
       productName: form.productName,
       productCode: form.productCode,
-      hsCode: form.hsCode,
+      isService: form.isService || false,
+      hsCode: form.isService ? '' : form.hsCode,
       description: form.description || undefined,
       unitOfMeasure: form.unitOfMeasure,
       defaultSalePrice: parseFloat(form.defaultSalePrice),
       defaultTaxRate: parseInt(form.defaultTaxRate),
-      isThirdSchedule: form.isThirdSchedule || false,
+      isThirdSchedule: form.isService ? false : (form.isThirdSchedule || false),
       mrp: form.isThirdSchedule && form.mrp ? parseFloat(form.mrp) : null,
       sroScheduleNo: form.sroScheduleNo || null,
       sroItemSerialNo: form.sroItemSerialNo || null,
@@ -216,6 +222,7 @@ export default function ProductsPage() {
                   <tr key={p.id}>
                     <td>
                       <div className="font-semibold text-neutral-800">{p.productName}
+                        {p.isService && <span className="ml-2 badge badge-warning text-xs">Service</span>}
                         {p.isThirdSchedule && <span className="ml-2 badge badge-primary text-xs">3rd Sch.</span>}
                       </div>
                       {p.description && <div className="text-xs text-neutral-400 mt-0.5 truncate max-w-xs">{p.description}</div>}
@@ -226,9 +233,10 @@ export default function ProductsPage() {
                       </span>
                     </td>
                     <td>
-                      <span className="font-numeric text-xs text-primary font-semibold">
-                        {p.hsCode}
-                      </span>
+                      {p.isService
+                        ? <span className="text-xs text-neutral-400 italic">— service —</span>
+                        : <span className="font-numeric text-xs text-primary font-semibold">{p.hsCode}</span>
+                      }
                     </td>
                     <td className="text-neutral-600">{p.unitOfMeasure}</td>
                     <td className="t-right font-semibold font-numeric text-neutral-800">
@@ -268,31 +276,48 @@ export default function ProductsPage() {
                 </div>
               )}
               <form onSubmit={handleSave} className="space-y-4">
+                {/* Service Toggle */}
+                <div className="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
+                  style={{ borderColor: form.isService ? '#0C3D5E' : '#E5E7EB', background: form.isService ? '#EBF4FA' : '' }}
+                  onClick={() => setForm(f => ({ ...f, isService: !f.isService, isThirdSchedule: false }))}>
+                  <input type="checkbox" id="isService" checked={form.isService} onChange={() => {}}
+                    className="w-4 h-4 accent-primary pointer-events-none" />
+                  <label htmlFor="isService" className="cursor-pointer">
+                    <div className="text-sm font-semibold text-neutral-800">💼 Service Item (No HS Code)</div>
+                    <div className="text-xs text-neutral-500 mt-0.5">For consulting, IT, labour, rent, or any non-goods service</div>
+                  </label>
+                </div>
+
                 {/* Product Name */}
                 <div className="form-group">
-                  <label className="form-label req">Product Name</label>
-                  <input type="text" required className="form-input" placeholder="e.g. Sulfuric Acid 98%"
+                  <label className="form-label req">{form.isService ? 'Service Name' : 'Product Name'}</label>
+                  <input type="text" required className="form-input"
+                    placeholder={form.isService ? 'e.g. Web Development, Consulting' : 'e.g. Steel Rod, Cement Bag'}
                     value={form.productName} onChange={set('productName')} />
                 </div>
 
                 {/* Code + HS Code */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="form-group">
-                    <label className="form-label req">Product Code</label>
-                    <input type="text" required className="form-input font-numeric" placeholder="CHEM-001"
+                    <label className="form-label req">{form.isService ? 'Service Code' : 'Product Code'}</label>
+                    <input type="text" required className="form-input font-numeric"
+                      placeholder={form.isService ? 'SVC-001' : 'PRD-001'}
                       value={form.productCode} onChange={set('productCode')} />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label req">HS Code <span className="text-xs text-neutral-400">(4–8 digits)</span></label>
-                    <input type="text" required className="form-input font-numeric" placeholder="28070010"
-                      value={form.hsCode} onChange={set('hsCode')} />
-                  </div>
+                  {!form.isService && (
+                    <div className="form-group">
+                      <label className="form-label req">HS Code <span className="text-xs text-neutral-400">(4–8 digits)</span></label>
+                      <input type="text" required className="form-input font-numeric" placeholder="28070010"
+                        value={form.hsCode} onChange={set('hsCode')} />
+                    </div>
+                  )}
                 </div>
 
                 {/* Description */}
                 <div className="form-group">
                   <label className="form-label">Description</label>
-                  <input type="text" className="form-input" placeholder="Optional product description"
+                  <input type="text" className="form-input"
+                    placeholder={form.isService ? 'Describe the service scope' : 'Optional product description'}
                     value={form.description} onChange={set('description')} />
                 </div>
 
@@ -305,7 +330,7 @@ export default function ProductsPage() {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label className="form-label req">Sale Price (PKR)</label>
+                    <label className="form-label req">{form.isService ? 'Rate (PKR)' : 'Sale Price (PKR)'}</label>
                     <input type="number" required min="0" step="0.01" className="form-input font-numeric"
                       placeholder="0.00" value={form.defaultSalePrice}
                       onChange={set('defaultSalePrice')} />
@@ -319,10 +344,11 @@ export default function ProductsPage() {
                     onChange={e => setForm(f => ({ ...f, defaultTaxRate: parseInt(e.target.value) }))}>
                     {TAX_RATES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
-                  <div className="form-hint">Used as default when adding this product to an invoice</div>
+                  <div className="form-hint">Used as default when adding this {form.isService ? 'service' : 'product'} to an invoice</div>
                 </div>
 
-                {/* Third Schedule */}
+                {/* Third Schedule — only for physical goods */}
+                {!form.isService && (
                 <div className="form-group">
                   <label className="form-label">Third Schedule (MRP-based Tax)</label>
                   <div className="flex items-center gap-3 mt-1 p-3 rounded-lg border border-neutral-200 bg-neutral-50">
@@ -338,6 +364,7 @@ export default function ProductsPage() {
                     </label>
                   </div>
                 </div>
+                )}
 
                 {form.isThirdSchedule && (
                   <div className="form-group">

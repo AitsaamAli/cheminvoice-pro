@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import Layout from '../components/Layout';
 
@@ -50,6 +51,7 @@ const regTypeBadge = (t) => {
 };
 
 export default function CustomersPage() {
+  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -175,7 +177,18 @@ export default function CustomersPage() {
                     <td className="text-neutral-600">{c.city || '—'}</td>
                     <td className="text-neutral-600 text-sm">{c.contactPhone || '—'}</td>
                     <td className="t-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1 flex-wrap">
+                        <button
+                          onClick={() => navigate(`/customers/${c.id}/ledger`)}
+                          className="btn btn-ghost btn-sm gap-1"
+                          style={{ color: '#0C3D5E', fontSize: '0.7rem' }}
+                          title="View customer ledger"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+                          </svg>
+                          Ledger
+                        </button>
                         <button onClick={() => openEdit(c)} className="btn btn-ghost btn-sm gap-1 text-primary">
                           <IcEdit /> Edit
                         </button>
