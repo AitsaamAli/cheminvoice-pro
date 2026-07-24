@@ -427,3 +427,125 @@ export async function generateQuotationPDF(quotation, company) {
 
   doc.save(`Quotation-${quotation.quotationNumber}.pdf`);
 }
+
+// ── Generate Sales Report PDF ────────────────────────────────────────────────
+export async function generateReportPDF(invoices, company, range, totals) {
+  const doc = newDoc();
+  const { w } = ps(doc);
+  const M = 14;
+  const logoData = company?.logoBase64 ? await loadLogo(company.logoBase64) : null;
+
+  // ── Header stripe
+  doc.setFillColor(...BL); doc.rect(0, 0, w, 28, 'F');
+  doc.setFillColor(...AMB); doc.rect(w-36, 0, 36, 28, 'F');
+  if (logoData) { try { doc.addImage(logoData, 'PNG', M, 5, 18, 14, '', 'FAST'); } catch {} }
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...WH);
+  doc.text((company?.businessName || 'Company').toUpperCase(), logoData ? M+22 : M, 12);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(187,213,228);
+  doc.text([
+    company?.ntn ? `NTN: ${company.ntn}` : '',
+    company?.strn ? `STRN: ${company.strn}` : '',
+  ].filter(Boolean).join('  ·  '), logoData ? M+22 : M, 19);
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...AMB);
+  doc.text('SALES REPORT', w-M, 12, { align:'right' });
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...WH);
+  doc.text(`Period: ${FMT(range?.startDate)} — ${FMT(range?.endDate)}`, w-M, 20, { align:'right' });
+
+  let y = 38;
+
+  // ── Summary stat boxes
+  const stats = [
+    { label:'Total Invoices', value: String(totals.count||invoices.length) },
+    { label:'Taxable Value',  value: PKR(totals.taxable) },
+    { label:'Sales Tax',      value: PKR(totals.tax) },
+    { label:'Grand Total',    value: PKR(totals.amount), hi: true },
+    { label:'Outstanding',    value: PKR(totals.unpaid), red: totals.unpaid > 0 },
+  ];
+  const bw = (w-M*2-4*(stats.length-1))/stats.length;
+  stats.forEach((s, i) => {
+    const bx = M + i*(bw+4);
+    doc.setFillColor(...(s.hi ? BL : s.red ? [220,38,38] : BG));
+    doc.roundedRect(bx, y, bw, 18, 1, 1, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5);
+    doc.setTextColor(...(s.hi||s.red ? WH : MUT));
+    doc.text(s.label, bx + bw/2, y+6, { align:'center' });
+    doc.setFont('helvetica','bold'); doc.setFontSize(s.hi ? 9 : 8);
+    doc.setTextColor(...(s.hi||s.red ? WH : DK));
+    doc.text(s.value, bx + bw/2, y+14, { align:'center' });
+  });
+  y += 24;
+
+  // ── Accepted invoices count note
+  const accepted = invoices.filter(i => i.fbrStatus === 'ACCEPTED').length;
+  doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(...MUT);
+  doc.text(`FBR Accepted: ${accepted} of ${invoices.length} invoices  |  Generated: ${new Date().toLocaleString('en-GB')}  |  Nizaam.com`, M, y);
+  y += 8;
+
+  // ── Invoice table
+  const dateStr = d => { try { return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return ''; } };
+  autoTable(doc, {
+    startY: y,
+    head: [['#','INVOICE NO','DATE','CUSTOMER','TAXABLE (PKR)','TAX (PKR)','TOTAL (PKR)','FBR','PAYMENT']],
+    body: invoices.map((inv, i) => [
+      String(i+1).padStart(3,'0'),
+      inv.invoiceNumber,
+      dateStr(inv.invoiceDate),
+      (inv.customer?.businessName || '').slice(0, 30),
+      _fmt(inv.totalTaxableValue),
+      _fmt(inv.totalSalesTax),
+      _fmt(inv.totalInvoiceAmount),
+      inv.fbrStatus || 'PENDING',
+      inv.paymentStatus || 'UNPAID',
+    ]),
+    foot: [['','','','TOTAL',
+      _fmt(totals.taxable),
+      _fmt(totals.tax),
+      _fmt(totals.amount),
+      `${accepted} acc.`,
+      `${invoices.filter(i=>i.paymentStatus==='PAID').length} paid`,
+    ]],
+    theme: 'plain',
+    headStyles: { fillColor:BL, textColor:WH, fontStyle:'bold', fontSize:7, cellPadding:{top:4,bottom:4,left:3,right:3} },
+    bodyStyles: { fontSize:7.5, cellPadding:{top:3.5,bottom:3.5,left:3,right:3}, textColor:DK },
+    alternateRowStyles: { fillColor:BG },
+    footStyles: { fillColor:BL, textColor:WH, fontStyle:'bold', fontSize:7.5 },
+    columnStyles: {
+      0: { halign:'center', cellWidth:8, textColor:MUT },
+      1: { cellWidth:32, fontStyle:'bold', textColor:BL2 },
+      2: { cellWidth:20 },
+      3: { cellWidth:'auto' },
+      4: { halign:'right', cellWidth:28 },
+      5: { halign:'right', cellWidth:22, textColor:GRN },
+      6: { halign:'right', cellWidth:28, fontStyle:'bold' },
+      7: { halign:'center', cellWidth:18, fontSize:6.5 },
+      8: { halign:'center', cellWidth:16, fontSize:6.5 },
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.column.index === 7) {
+        const v = data.cell.raw;
+        if (v === 'ACCEPTED') data.cell.styles.textColor = GRN;
+        else if (v === 'ERROR' || v === 'CANCELLED') data.cell.styles.textColor = RED;
+        else data.cell.styles.textColor = [180,107,0];
+      }
+      if (data.section === 'body' && data.column.index === 8) {
+        const v = data.cell.raw;
+        if (v === 'PAID') data.cell.styles.textColor = GRN;
+        else if (v === 'PARTIAL') data.cell.styles.textColor = [180,107,0];
+        else data.cell.styles.textColor = RED;
+      }
+    },
+    margin: { left:M, right:M },
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  // ── Footer
+  drawFooter(doc, company || { businessName: '' });
+
+  const filename = `Sales-Report-${range?.startDate||'all'}-to-${range?.endDate||'all'}.pdf`;
+  doc.save(filename);
+}
+
+// ── Print helper — opens system print dialog on current page ─────────────────
+export function printCurrentPage() {
+  window.print();
+}

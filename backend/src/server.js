@@ -58,10 +58,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// ── Body limits — 1MB is more than enough for JSON invoices ──────────────────
-// ✅ FIX: was 50MB — a 50MB JSON body is a DoS vector
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ limit: '1mb', extended: true }));
+// ── Body limits — 5MB to accommodate base64-encoded company logos ─────────────
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
 // ── Logging — strip Authorization header from logs ───────────────────────────
 morgan.token('user-id', (req) => req.user?.id || 'anonymous');

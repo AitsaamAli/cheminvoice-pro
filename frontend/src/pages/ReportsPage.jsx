@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import Layout from '../components/Layout';
+import { generateReportPDF, printCurrentPage } from '../utils/pdfGenerator';
 
 const fmt = (n) => `PKR ${parseFloat(n || 0).toLocaleString('en-PK', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
 const fmtN = (n) => parseFloat(n || 0).toLocaleString('en-PK', { maximumFractionDigits: 2 });
@@ -37,17 +39,50 @@ function downloadCSV(rows, filename) {
 }
 
 export default function ReportsPage() {
+  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'aging'
+  const [company, setCompany] = useState(null);
+  const [pdfing, setPdfing] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(null);
   const today = new Date();
   const [range, setRange] = useState({
     startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
     endDate: today.toISOString().split('T')[0],
   });
 
+  useEffect(() => {
+    API.get('/auth/me').then(r => setCompany(r.data?.company || null)).catch(() => {});
+  }, []);
   useEffect(() => { load(); }, [range]);
+
+  const handleMarkPaid = async (inv) => {
+    setMarkingPaid(inv.id);
+    try {
+      await API.patch(`/invoices/${inv.id}/payment`, {
+        paidAmount: parseFloat(inv.totalInvoiceAmount),
+        paymentStatus: 'PAID',
+      });
+      load();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Payment update fail ho gayi');
+    } finally {
+      setMarkingPaid(null);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setPdfing(true);
+    try {
+      await generateReportPDF(invoices, company, range, totals);
+    } catch (e) {
+      alert('PDF generate nahi hui: ' + (e.message || e));
+    } finally {
+      setPdfing(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -142,13 +177,35 @@ export default function ReportsPage() {
               <button
                 onClick={() => downloadCSV(invoices, filename)}
                 disabled={invoices.length === 0}
-                className="btn btn-primary btn-sm gap-1"
+                className="btn btn-outline btn-sm gap-1"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Export CSV
+                CSV
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                disabled={invoices.length === 0 || pdfing}
+                className="btn btn-primary btn-sm gap-1"
+              >
+                {pdfing
+                  ? <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                }
+                PDF
+              </button>
+              <button
+                onClick={printCurrentPage}
+                disabled={invoices.length === 0}
+                className="btn btn-outline btn-sm gap-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                  <rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                Print
               </button>
             </div>
           </div>
@@ -352,6 +409,7 @@ export default function ReportsPage() {
                     <th className="t-right">Total</th>
                     <th className="t-center">FBR</th>
                     <th className="t-center">Payment</th>
+                    <th className="t-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -367,6 +425,30 @@ export default function ReportsPage() {
                       <td className="t-right font-numeric font-bold text-neutral-800">{fmtN(inv.totalInvoiceAmount)}</td>
                       <td className="t-center">{fbrBadge(inv.fbrStatus)}</td>
                       <td className="t-center">{payBadge(inv.paymentStatus)}</td>
+                      <td className="t-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => navigate(`/invoices/${inv.id}/pdf`)}
+                            className="btn btn-ghost btn-sm text-primary"
+                            title="View PDF"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          </button>
+                          {inv.paymentStatus !== 'PAID' && inv.fbrStatus !== 'CANCELLED' && (
+                            <button
+                              onClick={() => handleMarkPaid(inv)}
+                              disabled={markingPaid === inv.id}
+                              className="btn btn-ghost btn-sm text-green-600"
+                              title="Mark Paid"
+                            >
+                              {markingPaid === inv.id
+                                ? <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                              }
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

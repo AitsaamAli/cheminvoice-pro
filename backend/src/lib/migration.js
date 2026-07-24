@@ -112,6 +112,22 @@ async function runMigrations(prisma) {
       "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Phase 10 — Customer soft-delete flag (replaces [DELETED] name hack)
+  await runPhase(prisma, 'customer-isDeleted', `
+    ALTER TABLE "Customer"
+      ADD COLUMN IF NOT EXISTS "isDeleted" BOOLEAN NOT NULL DEFAULT false
+  `);
+  // Migrate existing [DELETED] customers to the proper flag
+  await runPhase(prisma, 'customer-isDeleted-migrate', `
+    UPDATE "Customer"
+    SET "isDeleted" = true,
+        "businessName" = REPLACE(REPLACE(REPLACE(REPLACE(
+          "businessName",
+          ' [DELETED]', ''), '[DELETED] ', ''), '[DELETED]', ''),
+          '  ', ' ')
+    WHERE "businessName" LIKE '%[DELETED]%'
+  `);
 }
 
 module.exports = { runMigrations };

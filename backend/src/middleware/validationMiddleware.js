@@ -86,7 +86,7 @@ const schemas = {
     address: Joi.string().max(MAX.address).optional().allow(''),
     province: Joi.string().max(100).optional().allow(''),
     city: Joi.string().max(100).optional().allow(''),
-    contactPhone: Joi.string().max(20).optional().allow(''),
+    contactPhone: Joi.string().max(30).optional().allow(''),
     contactEmail: Joi.string().email().max(MAX.email).optional().allow('')
       .messages({ 'string.email': 'Valid email required' }),
     businessType: Joi.string().valid(

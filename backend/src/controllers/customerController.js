@@ -37,14 +37,15 @@ const listCustomers = asyncHandler(async (req, res) => {
   const skip = Math.max(0, parseInt(req.query.skip) || 0);
   const take = Math.min(MAX_TAKE, Math.max(1, parseInt(req.query.take) || 50));
 
+  const where = { companyId, isDeleted: false };
   const [customers, total] = await Promise.all([
     prisma.customer.findMany({
-      where: { companyId },
+      where,
       skip,
       take,
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.customer.count({ where: { companyId } }),
+    prisma.customer.count({ where }),
   ]);
 
   res.json({ customers, pagination: { total, skip, take } });
@@ -106,12 +107,11 @@ const deleteCustomer = asyncHandler(async (req, res) => {
   if (!existing) throw new AppError('Customer not found', 404);
   if (existing.companyId !== req.user.companyId) throw new AppError('Access denied', 403);
 
-  // If customer has invoices, soft-delete to preserve history
+  // If customer has invoices, soft-delete to preserve invoice history
   if (existing._count.invoices > 0) {
-    // Archive by appending [DELETED] — preserves invoice references
     await prisma.customer.update({
       where: { id: customerId },
-      data: { businessName: `${existing.businessName} [DELETED]` },
+      data: { isDeleted: true },
     });
     return res.json({ success: true, message: 'Customer archived (has existing invoices)' });
   }

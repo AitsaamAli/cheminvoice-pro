@@ -35,6 +35,7 @@ const taxRates = [
 
 export default function SettingsPage() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [companyId, setCompanyId] = useState(user.companyId || '');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -57,6 +58,7 @@ export default function SettingsPage() {
   useEffect(() => {
     API.get('/auth/me').then(({ data }) => {
       const c = data.company || {};
+      setCompanyId(data.companyId || c.id || user.companyId || '');
       setCompany({
         businessName: c.businessName || '',
         ntn: c.ntn || '',
@@ -99,7 +101,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setSaving(true); setSaved(false); setError('');
     try {
-      await API.put(`/companies/${user.companyId}`, company);
+      await API.put(`/companies/${companyId}`, company);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {

@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import Layout from '../components/Layout';
 
+const IcTrash = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+  </svg>
+);
+
 const IcPlus = () => (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -146,6 +152,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(null);
   const [markingPaid, setMarkingPaid] = useState(null);
+  const [cancelling, setCancelling] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [topCustomers, setTopCustomers] = useState([]);
 
@@ -240,6 +247,19 @@ export default function Dashboard() {
       alert(err.response?.data?.error || 'Payment update fail ho gayi');
     } finally {
       setMarkingPaid(null);
+    }
+  };
+
+  const handleCancel = async (inv) => {
+    if (!confirm(`Invoice ${inv.invoiceNumber} cancel karein? Yeh undo nahi ho sakti.`)) return;
+    setCancelling(inv.id);
+    try {
+      await API.delete(`/invoices/${inv.id}`);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Cancel fail ho gayi');
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -438,6 +458,19 @@ export default function Dashboard() {
                         >
                           <IcEye /><span className="hidden sm:inline">View</span>
                         </button>
+                        {/* Cancel */}
+                        {inv.fbrStatus !== 'CANCELLED' && (
+                          <button
+                            onClick={() => handleCancel(inv)}
+                            disabled={cancelling === inv.id}
+                            className="btn btn-ghost btn-sm text-danger gap-1"
+                            title="Invoice cancel karein"
+                          >
+                            {cancelling === inv.id
+                              ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                              : <IcTrash />}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

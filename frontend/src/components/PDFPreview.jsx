@@ -40,16 +40,19 @@ export default function PDFPreview() {
 
   const loadAll = async () => {
     try {
-      const res = await API.get(`/invoices/${id}`);
-      const inv = res.data;
-      setInvoice(inv);
-      // Load company info for logo + branding
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      if (user.companyId) {
-        try {
-          const cr = await API.get(`/companies/${user.companyId}`);
-          setCompany(cr.data?.company || cr.data);
-        } catch {}
+      const [invRes, meRes] = await Promise.all([
+        API.get(`/invoices/${id}`),
+        API.get('/auth/me').catch(() => null),
+      ]);
+      setInvoice(invRes.data);
+      if (meRes?.data?.company) {
+        setCompany(meRes.data.company);
+      } else {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.companyId) {
+          const cr = await API.get(`/companies/${user.companyId}`).catch(() => null);
+          if (cr) setCompany(cr.data?.company || cr.data);
+        }
       }
     } catch (err) {
       setError('Invoice load nahi hui');
