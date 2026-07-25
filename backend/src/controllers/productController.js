@@ -36,9 +36,18 @@ const createProduct = asyncHandler(async (req, res) => {
 
 const listProducts = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
-  // ✅ FIX: clamp take
   const skip = Math.max(0, parseInt(req.query.skip) || 0);
   const take = Math.min(MAX_TAKE, Math.max(1, parseInt(req.query.take) || 100));
+
+  // Low-stock filter: Prisma can't compare two columns, so fetch + filter in JS
+  if (req.query.lowStock === 'true') {
+    const all = await prisma.product.findMany({
+      where: { companyId, isActive: true, trackStock: true },
+      orderBy: { stockQuantity: 'asc' },
+    });
+    const low = all.filter(p => p.stockQuantity <= p.reorderLevel);
+    return res.json({ products: low, pagination: { total: low.length, skip: 0, take: low.length } });
+  }
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({

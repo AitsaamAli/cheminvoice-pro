@@ -33,14 +33,29 @@ const taxRates = [
   { rate: '18%', label: 'Standard GST',desc: 'Default rate',     color: '#D97706' },
 ];
 
+const ROLES = [
+  { value: 'ADMIN',      label: 'Admin',      desc: 'Full access, can manage users & settings' },
+  { value: 'ACCOUNTANT', label: 'Accountant', desc: 'Invoices, payments, reports' },
+  { value: 'STAFF',      label: 'Staff',      desc: 'Create invoices and quotations only' },
+];
+const roleColor = { ADMIN: 'badge-primary', ACCOUNTANT: 'badge-success', STAFF: 'badge-info', VIEWER: 'badge-neutral' };
+
 export default function SettingsPage() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [companyId, setCompanyId] = useState(user.companyId || '');
+  const [settingsTab, setSettingsTab] = useState('company');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [fbrMode, setFbrMode] = useState('sandbox');
+  // Users tab state
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: '', firstName: '', lastName: '', role: 'STAFF', password: '' });
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState('');
   const [company, setCompany] = useState({
     businessName: '',
     ntn: '',
@@ -58,7 +73,9 @@ export default function SettingsPage() {
   useEffect(() => {
     API.get('/auth/me').then(({ data }) => {
       const c = data.company || {};
-      setCompanyId(data.companyId || c.id || user.companyId || '');
+      const cid = data.companyId || c.id || user.companyId || '';
+      setCompanyId(cid);
+      loadUsers(cid);
       setCompany({
         businessName: c.businessName || '',
         ntn: c.ntn || '',
@@ -76,6 +93,47 @@ export default function SettingsPage() {
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const loadUsers = async (cid) => {
+    if (!cid) return;
+    setUsersLoading(true);
+    try {
+      const res = await API.get(`/companies/${cid}/users`);
+      setUsers(res.data.users || []);
+    } catch {} finally { setUsersLoading(false); }
+  };
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    setInviting(true); setInviteError('');
+    try {
+      const res = await API.post(`/companies/${companyId}/users`, inviteForm);
+      setUsers(u => [...u, res.data.user]);
+      setInviteOpen(false);
+      setInviteForm({ email: '', firstName: '', lastName: '', role: 'STAFF', password: '' });
+    } catch (err) {
+      setInviteError(err.response?.data?.error || 'Invite fail ho gayi');
+    } finally { setInviting(false); }
+  };
+
+  const handleRoleChange = async (userId, role) => {
+    try {
+      await API.put(`/users/${userId}/role`, { role });
+      setUsers(u => u.map(x => x.id === userId ? { ...x, role } : x));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Role update fail ho gayi');
+    }
+  };
+
+  const handleDeactivate = async (userId) => {
+    if (!confirm('Is user ko deactivate karein?')) return;
+    try {
+      await API.delete(`/users/${userId}`);
+      setUsers(u => u.map(x => x.id === userId ? { ...x, isActive: false } : x));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Deactivate fail ho gayi');
+    }
+  };
 
   const set = (k) => (e) => setCompany(c => ({ ...c, [k]: e.target.value }));
 
@@ -126,7 +184,108 @@ export default function SettingsPage() {
 
   return (
     <Layout title="Settings">
-      <div className="max-w-3xl space-y-5">
+      <div className="max-w-3xl">
+
+        {/* Tab switcher */}
+        <div className="flex gap-2 mb-5">
+          {[
+            { key: 'company', label: 'Company & Logo' },
+            { key: 'users',   label: `Users (${users.length})` },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setSettingsTab(t.key)}
+              className={`btn btn-sm ${settingsTab === t.key ? 'btn-primary' : 'btn-outline'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Users Tab ── */}
+        {settingsTab === 'users' && (
+          <div className="space-y-5">
+            {/* Users list */}
+            <div className="card animate-fade-up">
+              <div className="card-header">
+                <div>
+                  <div className="card-title">Team Members</div>
+                  <div className="text-xs text-neutral-400 mt-0.5">Is company ke saare users</div>
+                </div>
+                {user.role === 'ADMIN' && (
+                  <button className="btn btn-primary btn-sm" onClick={() => setInviteOpen(true)}>
+                    + Add User
+                  </button>
+                )}
+              </div>
+              <div className="card-body p-0">
+                {usersLoading ? (
+                  <div className="p-6 space-y-3">{[1,2,3].map(i => <div key={i} className="skeleton h-12" />)}</div>
+                ) : (
+                  <div className="divide-y divide-neutral-100">
+                    {users.map(u => (
+                      <div key={u.id} className="flex items-center gap-3 px-5 py-3.5">
+                        <div className="w-9 h-9 rounded-xl bg-primary-light flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                          {(u.firstName?.[0] || '') + (u.lastName?.[0] || '')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-neutral-800">{u.firstName} {u.lastName}</span>
+                            {u.id === user.id && <span className="text-xs text-neutral-400">(you)</span>}
+                            {!u.isActive && <span className="badge badge-neutral text-xs">Inactive</span>}
+                          </div>
+                          <div className="text-xs text-neutral-400">{u.email}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {user.role === 'ADMIN' && u.id !== user.id && u.isActive ? (
+                            <select
+                              className="form-select text-xs py-1 h-7"
+                              value={u.role}
+                              onChange={e => handleRoleChange(u.id, e.target.value)}
+                            >
+                              {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                            </select>
+                          ) : (
+                            <span className={`badge ${roleColor[u.role] || 'badge-neutral'}`}>{u.role}</span>
+                          )}
+                          {user.role === 'ADMIN' && u.id !== user.id && u.isActive && (
+                            <button
+                              onClick={() => handleDeactivate(u.id)}
+                              className="btn btn-ghost btn-sm text-danger"
+                              title="Deactivate user"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Roles reference */}
+            <div className="card animate-fade-up anim-delay-1">
+              <div className="card-header"><div className="card-title">Role Permissions</div></div>
+              <div className="card-body p-0">
+                <div className="divide-y divide-neutral-100">
+                  {ROLES.map(r => (
+                    <div key={r.value} className="flex items-center gap-3 px-5 py-3">
+                      <span className={`badge ${roleColor[r.value]}`}>{r.label}</span>
+                      <span className="text-sm text-neutral-500">{r.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Company Tab ── */}
+        {settingsTab === 'company' && <div className="space-y-5">
 
         {/* Company Info */}
         <div className="card animate-fade-up">
@@ -366,7 +525,60 @@ export default function SettingsPage() {
           </div>
         </div>
 
-      </div>
+        </div>{/* end company tab */}
+        </div>{/* end max-w-3xl */}
+
+        {/* Invite User Modal */}
+        {inviteOpen && (
+          <div className="modal-backdrop" onClick={() => setInviteOpen(false)}>
+            <div className="modal-box" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-title">Add Team Member</div>
+                <button className="modal-close" onClick={() => setInviteOpen(false)}>×</button>
+              </div>
+              <form onSubmit={handleInvite} className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="form-group">
+                    <label className="form-label req">First Name</label>
+                    <input className="form-input" required value={inviteForm.firstName}
+                      onChange={e => setInviteForm(f => ({ ...f, firstName: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label req">Last Name</label>
+                    <input className="form-input" required value={inviteForm.lastName}
+                      onChange={e => setInviteForm(f => ({ ...f, lastName: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label req">Email</label>
+                  <input type="email" className="form-input" required value={inviteForm.email}
+                    onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label req">Role</label>
+                  <select className="form-select" value={inviteForm.role}
+                    onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))}>
+                    {ROLES.map(r => (
+                      <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label req">Password (min 8 chars)</label>
+                  <input type="password" className="form-input" required minLength={8} value={inviteForm.password}
+                    onChange={e => setInviteForm(f => ({ ...f, password: e.target.value }))} />
+                </div>
+                {inviteError && <p className="text-sm text-red-600">{inviteError}</p>}
+                <div className="flex gap-3 pt-1">
+                  <button type="button" onClick={() => setInviteOpen(false)} className="btn btn-ghost flex-1">Cancel</button>
+                  <button type="submit" disabled={inviting} className="btn btn-primary flex-1">
+                    {inviting ? 'Creating…' : 'Create User'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
     </Layout>
   );
 }

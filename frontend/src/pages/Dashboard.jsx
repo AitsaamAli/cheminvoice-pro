@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import Layout from '../components/Layout';
+import PaymentModal from '../components/PaymentModal';
 
 const IcTrash = () => (
   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -151,14 +152,18 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ today: 0, monthly: 0, pending: 0, outstanding: 0 });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(null);
-  const [markingPaid, setMarkingPaid] = useState(null);
   const [cancelling, setCancelling] = useState(null);
+  const [paymentInv, setPaymentInv] = useState(null);
+  const [lowStock, setLowStock] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [topCustomers, setTopCustomers] = useState([]);
 
   useEffect(() => {
     load();
     loadChart();
+    API.get(`/companies/${user.companyId}/products?lowStock=true`)
+      .then(r => setLowStock(r.data.products || []))
+      .catch(() => {});
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, []);
@@ -235,20 +240,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleMarkPaid = async (inv) => {
-    setMarkingPaid(inv.id);
-    try {
-      await API.patch(`/invoices/${inv.id}/payment`, {
-        paidAmount: parseFloat(inv.totalInvoiceAmount),
-        paymentStatus: 'PAID',
-      });
-      load();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Payment update fail ho gayi');
-    } finally {
-      setMarkingPaid(null);
-    }
-  };
 
   const handleCancel = async (inv) => {
     if (!confirm(`Invoice ${inv.invoiceNumber} cancel karein? Yeh undo nahi ho sakti.`)) return;
@@ -346,6 +337,35 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Low Stock Alert */}
+      {lowStock.length > 0 && (
+        <div className="card animate-fade-up anim-delay-5 mb-5" style={{ borderColor: '#F0A500', borderWidth: 1 }}>
+          <div className="card-header" style={{ background: '#FFFBEB' }}>
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span className="card-title text-amber-700">Low Stock Alert</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-800">{lowStock.length} products</span>
+            </div>
+            <button className="btn btn-ghost btn-sm text-xs" onClick={() => navigate('/products')}>View All →</button>
+          </div>
+          <div className="card-body pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {lowStock.map(p => (
+                <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-800 truncate max-w-28">{p.productName}</div>
+                    <div className="text-xs text-amber-600 font-numeric mt-0.5">Stock: {p.stockQuantity} / Min: {p.reorderLevel}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Recent Invoices */}
       <div className="card animate-fade-up anim-delay-5">
         <div className="card-header">
@@ -423,19 +443,16 @@ export default function Dashboard() {
                             <span className="hidden sm:inline">FBR</span>
                           </button>
                         )}
-                        {/* Mark paid */}
-                        {inv.fbrStatus === 'ACCEPTED' && inv.paymentStatus !== 'PAID' && (
+                        {/* Pay / Partial payment */}
+                        {inv.paymentStatus !== 'PAID' && inv.fbrStatus !== 'CANCELLED' && (
                           <button
-                            onClick={() => handleMarkPaid(inv)}
-                            disabled={markingPaid === inv.id}
+                            onClick={() => setPaymentInv(inv)}
                             className="btn btn-sm gap-1"
                             style={{ background: '#059669', color: '#fff', fontSize: '0.7rem', padding: '4px 8px' }}
-                            title="Payment receive ho gayi"
+                            title="Payment record karein"
                           >
-                            {markingPaid === inv.id
-                              ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                              : <IcCheck />}
-                            <span className="hidden sm:inline">Paid</span>
+                            <IcCheck />
+                            <span className="hidden sm:inline">Pay</span>
                           </button>
                         )}
                         {/* WhatsApp share */}
@@ -480,6 +497,14 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {paymentInv && (
+        <PaymentModal
+          invoice={paymentInv}
+          onClose={() => setPaymentInv(null)}
+          onSaved={() => { load(); setPaymentInv(null); }}
+        />
+      )}
     </Layout>
   );
 }

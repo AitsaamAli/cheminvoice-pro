@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API } from '../App';
 import { generateInvoicePDF } from '../utils/pdfGenerator';
+import PaymentModal from './PaymentModal';
 
 const fmt = n => 'PKR ' + (parseFloat(n)||0).toLocaleString('en-PK', { minimumFractionDigits: 2 });
 const fmtDate = d => { try { return new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); } catch { return ''; } };
@@ -34,6 +35,7 @@ export default function PDFPreview() {
   const [emailModal, setEmailModal] = useState(false);
   const [emailAddr, setEmailAddr] = useState('');
   const [emailing, setEmailing] = useState(false);
+  const [payModal, setPayModal] = useState(false);
   const [emailMsg, setEmailMsg] = useState('');
 
   useEffect(() => { loadAll(); }, [id]);
@@ -135,6 +137,11 @@ export default function PDFPreview() {
               <button onClick={() => { setEmailAddr(invoice.customer?.contactEmail||''); setEmailModal(true); }} className="btn btn-sm btn-secondary">
                 ✉ Email
               </button>
+              {invoice.paymentStatus !== 'PAID' && invoice.status !== 'CANCELLED' && (
+                <button onClick={() => setPayModal(true)} className="btn btn-sm" style={{ background:'#059669', color:'#fff', borderColor:'#059669' }}>
+                  💳 Pay
+                </button>
+              )}
               <button onClick={handleDownloadPDF} disabled={downloading} className="btn btn-primary btn-sm">
                 {downloading ? '…' : '↓ PDF Download'}
               </button>
@@ -325,6 +332,14 @@ export default function PDFPreview() {
             </div>
           </div>
         </div>
+      )}
+
+      {payModal && invoice && (
+        <PaymentModal
+          invoice={invoice}
+          onClose={() => setPayModal(false)}
+          onSaved={() => { loadAll(); setPayModal(false); }}
+        />
       )}
     </div>
   );

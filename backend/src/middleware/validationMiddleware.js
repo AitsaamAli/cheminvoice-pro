@@ -113,6 +113,18 @@ const schemas = {
     ).min(1).max(100).required(),
   }),
 
+  inviteUser: Joi.object({
+    email: Joi.string().email().max(MAX.email).required(),
+    firstName: Joi.string().max(100).required(),
+    lastName: Joi.string().max(100).required(),
+    role: Joi.string().valid('ADMIN', 'ACCOUNTANT', 'STAFF').required(),
+    password: Joi.string().min(8).max(128).required(),
+  }),
+
+  updateUserRole: Joi.object({
+    role: Joi.string().valid('ADMIN', 'ACCOUNTANT', 'STAFF').required(),
+  }),
+
   createInvoice: Joi.object({
     customerId: Joi.string().max(50).required(),
     invoiceDate: Joi.date().required(),

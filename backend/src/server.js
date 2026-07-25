@@ -19,6 +19,7 @@ const invoiceController = require('./controllers/invoiceController');
 const customerController = require('./controllers/customerController');
 const productController = require('./controllers/productController');
 const quotationController = require('./controllers/quotationController');
+const userController = require('./controllers/userController');
 const emailService = require('./services/emailService');
 const customerPortalRoutes = require('./routes/customerPortalRoutes');
 
@@ -203,6 +204,12 @@ app.post('/api/invoices/:invoiceId/send-email', verifyToken, async (req, res, ne
     res.json({ success: true, message: `Invoice email ho gayi: ${email}` });
   } catch (err) { next(err); }
 });
+
+// ── User management routes ────────────────────────────────────────────────────
+app.get('/api/companies/:companyId/users', verifyToken, requireCompanyAccess, userController.listCompanyUsers);
+app.post('/api/companies/:companyId/users', verifyToken, requireCompanyAccess, validate('inviteUser'), userController.inviteUser);
+app.put('/api/users/:userId/role', verifyToken, validate('updateUserRole'), userController.updateUserRole);
+app.delete('/api/users/:userId', verifyToken, userController.deactivateUser);
 
 // ── Customer Portal routes ────────────────────────────────────────────────────
 app.use('/api/customer-portal', otpLimiter, customerPortalRoutes);
