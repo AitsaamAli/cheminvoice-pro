@@ -16,6 +16,7 @@ const customerController = require('./controllers/customerController');
 const productController = require('./controllers/productController');
 const quotationController = require('./controllers/quotationController');
 const userController = require('./controllers/userController');
+const adminController = require('./controllers/adminController');
 const emailService = require('./services/emailService');
 const customerPortalRoutes = require('./routes/customerPortalRoutes');
 
@@ -157,6 +158,11 @@ app.get('/api/companies/:companyId/users', verifyToken, requireCompanyAccess, us
 app.post('/api/companies/:companyId/users', verifyToken, requireCompanyAccess, validate('inviteUser'), userController.inviteUser);
 app.put('/api/users/:userId/role', verifyToken, validate('updateUserRole'), userController.updateUserRole);
 app.delete('/api/users/:userId', verifyToken, userController.deactivateUser);
+
+// ── Admin (SUPERADMIN only) ───────────────────────────────────────────────────
+app.get('/api/admin/companies', verifyToken, adminController.listAllCompanies);
+app.patch('/api/admin/companies/:companyId/activate', verifyToken, adminController.activateCompany);
+app.patch('/api/admin/companies/:companyId/suspend', verifyToken, adminController.suspendCompany);
 
 // ── Customer Portal ───────────────────────────────────────────────────────────
 app.use('/api/customer-portal', otpLimiter, customerPortalRoutes);

@@ -128,6 +128,28 @@ async function runMigrations(prisma) {
           '  ', ' ')
     WHERE "businessName" LIKE '%[DELETED]%'
   `);
+
+  // Phase 11 — Subscription / trial fields on Company
+  await runPhase(prisma, 'company-subscription-status', `
+    ALTER TABLE "Company"
+      ADD COLUMN IF NOT EXISTS "subscriptionStatus" TEXT NOT NULL DEFAULT 'TRIAL'
+  `);
+  await runPhase(prisma, 'company-trial-invoices-used', `
+    ALTER TABLE "Company"
+      ADD COLUMN IF NOT EXISTS "trialInvoicesUsed" INTEGER NOT NULL DEFAULT 0
+  `);
+  await runPhase(prisma, 'company-trial-invoice-limit', `
+    ALTER TABLE "Company"
+      ADD COLUMN IF NOT EXISTS "trialInvoiceLimit" INTEGER NOT NULL DEFAULT 5
+  `);
+  await runPhase(prisma, 'company-activated-at', `
+    ALTER TABLE "Company"
+      ADD COLUMN IF NOT EXISTS "activatedAt" TIMESTAMP(3)
+  `);
+  await runPhase(prisma, 'company-suspended-at', `
+    ALTER TABLE "Company"
+      ADD COLUMN IF NOT EXISTS "suspendedAt" TIMESTAMP(3)
+  `);
 }
 
 module.exports = { runMigrations };

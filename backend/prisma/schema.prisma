@@ -41,6 +41,11 @@ model Company {
   logoBase64           String?
   lastInvoiceNumber    Int      @default(0)
   lastQuotationNumber  Int      @default(0)
+  subscriptionStatus   String   @default("TRIAL")
+  trialInvoicesUsed    Int      @default(0)
+  trialInvoiceLimit    Int      @default(5)
+  activatedAt          DateTime?
+  suspendedAt          DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

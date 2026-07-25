@@ -157,10 +157,14 @@ export default function Dashboard() {
   const [lowStock, setLowStock] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [topCustomers, setTopCustomers] = useState([]);
+  const [company, setCompany] = useState(null);
 
   useEffect(() => {
     load();
     loadChart();
+    API.get(`/companies/${user.companyId}`)
+      .then(r => setCompany(r.data.company))
+      .catch(() => {});
     API.get(`/companies/${user.companyId}/products?lowStock=true`)
       .then(r => setLowStock(r.data.products || []))
       .catch(() => {});
@@ -262,6 +266,36 @@ export default function Dashboard() {
 
   return (
     <Layout title={`Welcome, ${user.firstName || 'User'}`} actions={actions}>
+      {/* Trial / Suspended banner */}
+      {company?.subscriptionStatus === 'SUSPENDED' && (
+        <div className="mb-5 rounded-xl px-5 py-3.5 flex items-center gap-3" style={{ background: '#FEE2E2', border: '1px solid #FECACA' }}>
+          <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span className="text-sm font-medium text-red-800">
+            Your account is suspended. New invoices are blocked. Please contact support to reactivate.
+          </span>
+        </div>
+      )}
+      {company?.subscriptionStatus === 'TRIAL' && (
+        <div className="mb-5 rounded-xl px-5 py-3.5 flex items-center justify-between gap-3"
+          style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="#D97706" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span className="text-sm font-medium text-amber-800">
+              Free trial: <strong>{company.trialInvoicesUsed}</strong> of <strong>{company.trialInvoiceLimit}</strong> invoices used.
+              {company.trialInvoicesUsed >= company.trialInvoiceLimit
+                ? ' Trial limit reached — upgrade to continue.'
+                : ` ${company.trialInvoiceLimit - company.trialInvoicesUsed} remaining.`}
+            </span>
+          </div>
+          <a href="mailto:support@cheminvoice.com" className="text-xs font-semibold text-amber-700 hover:text-amber-900 whitespace-nowrap underline">
+            Upgrade Now
+          </a>
+        </div>
+      )}
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard

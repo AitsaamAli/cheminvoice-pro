@@ -20,6 +20,15 @@ const createInvoice = asyncHandler(async (req, res) => {
   ]);
 
   if (!company) throw new AppError('Company not found', 404);
+
+  // Subscription gate
+  if (company.subscriptionStatus === 'SUSPENDED') {
+    throw new AppError('Your account is suspended. Please contact support to reactivate.', 403);
+  }
+  if (company.subscriptionStatus === 'TRIAL' && company.trialInvoicesUsed >= company.trialInvoiceLimit) {
+    throw new AppError(`Free trial limit reached (${company.trialInvoiceLimit} invoices). Please upgrade to continue.`, 402);
+  }
+
   if (!customer) throw new AppError('Customer not found', 404);
 
   // ✅ FIX: IDOR — customer must belong to same company
@@ -150,6 +159,14 @@ const createInvoice = asyncHandler(async (req, res) => {
     }),
     ...stockDeductions,
   ]);
+
+  // Increment trial counter (fire-and-forget — invoice already saved)
+  if (company.subscriptionStatus === 'TRIAL') {
+    prisma.company.update({
+      where: { id: companyId },
+      data: { trialInvoicesUsed: { increment: 1 } },
+    }).catch(() => {});
+  }
 
   res.status(201).json({ success: true, message: 'Invoice created successfully', invoice });
 });
