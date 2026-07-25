@@ -56,6 +56,21 @@ function ProtectedRoute({ children }) {
   return token ? children : <Navigate to="/login" />;
 }
 
+function AdminRoute({ children }) {
+  const token = localStorage.getItem('accessToken');
+  if (!token) return <Navigate to="/login" />;
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  return user.role === 'SUPERADMIN' ? children : <Navigate to="/" />;
+}
+
+function UserRoute({ children }) {
+  const token = localStorage.getItem('accessToken');
+  if (!token) return <Navigate to="/login" />;
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  if (user.role === 'SUPERADMIN') return <Navigate to="/admin" />;
+  return children;
+}
+
 function CustomerProtectedRoute({ children }) {
   const token = localStorage.getItem('customerToken');
   return token ? children : <Navigate to="/customer-portal" />;
@@ -69,82 +84,82 @@ export default function App() {
         <Route
           path="/"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <Dashboard />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/invoices/create"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <InvoiceForm />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/invoices/:id/pdf"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <PDFPreview />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/customers"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <CustomersPage />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/products"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <ProductsPage />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/reports"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <ReportsPage />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/settings"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <SettingsPage />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/customers/:customerId/ledger"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <CustomerLedgerPage />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route
           path="/quotations"
           element={
-            <ProtectedRoute>
+            <UserRoute>
               <QuotationsPage />
-            </ProtectedRoute>
+            </UserRoute>
           }
         />
         <Route path="/landing" element={<LandingPage />} />
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <AdminPanel />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route path="/customer-portal" element={<CustomerPortalLogin />} />
