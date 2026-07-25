@@ -62,6 +62,28 @@ app.use(morgan(':method :url :status :response-time ms — user::user-id', {
 
 app.use('/api', apiLimiter);
 
+// ── First-time superadmin setup (works only if zero SUPERADMINs exist) ───────
+app.post('/api/auth/setup-admin', async (req, res, next) => {
+  try {
+    const { email, password, secret } = req.body;
+    if (!secret || secret !== process.env.SETUP_SECRET) {
+      return res.status(403).json({ error: 'Invalid setup secret' });
+    }
+    const prisma = require('./lib/prisma');
+    const existing = await prisma.user.findFirst({ where: { role: 'SUPERADMIN' } });
+    if (existing) return res.status(409).json({ error: 'Super admin already exists' });
+    const bcrypt = require('bcryptjs');
+    const hashed = await bcrypt.hash(password, 12);
+    const company = await prisma.company.create({
+      data: { businessName: 'Nizaam Admin', ntn: '0000000', strn: '0000000000000', address: 'Pakistan', province: 'Punjab', city: 'Lahore', subscriptionStatus: 'ACTIVE' },
+    });
+    await prisma.user.create({
+      data: { email, password: hashed, firstName: 'Super', lastName: 'Admin', companyId: company.id, role: 'SUPERADMIN' },
+    });
+    res.json({ success: true, message: 'Super admin created. You can now login.' });
+  } catch (err) { next(err); }
+});
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 app.post('/api/auth/register', authLimiter, validate('registerUser'), authController.register);
 app.post('/api/auth/login', authLimiter, validate('loginUser'), authController.login);
