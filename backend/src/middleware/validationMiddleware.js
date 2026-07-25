@@ -44,7 +44,7 @@ const schemas = {
     city: Joi.string().max(100).optional().allow(''),
     registrationType: Joi.string().valid('REGISTERED', 'UNREGISTERED', 'FOREIGN').default('UNREGISTERED'),
     contactPerson: Joi.string().max(MAX.name).optional().allow(''),
-    contactPhone: Joi.string().max(20).optional().allow(''),
+    contactPhone: Joi.string().max(30).optional().allow(''),
     contactEmail: Joi.string().email().max(MAX.email).optional().allow('')
       .messages({ 'string.email': 'Valid email required' }),
   }),

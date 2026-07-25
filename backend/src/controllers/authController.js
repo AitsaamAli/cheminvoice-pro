@@ -113,7 +113,11 @@ const logout = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    include: { company: true },
+    select: {
+      id: true, email: true, firstName: true, lastName: true,
+      role: true, companyId: true, isActive: true, lastLogin: true, createdAt: true,
+      company: true,
+    },
   });
 
   res.json(user);

@@ -12,7 +12,10 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "fbr:scenarios": "node scripts/fbrScenarioHarness.js"
+    "fbr:scenarios": "node scripts/fbrScenarioHarness.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
@@ -38,6 +41,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "jest": "^29.7.0",
+    "nodemon": "^2.0.22",
+    "supertest": "^6.3.4"
   }
 }
