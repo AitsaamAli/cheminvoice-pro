@@ -525,8 +525,8 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        </div>{/* end company tab */}
-        </div>{/* end max-w-3xl */}
+        </div>}
+        </div>
 
         {/* Invite User Modal */}
         {inviteOpen && (
