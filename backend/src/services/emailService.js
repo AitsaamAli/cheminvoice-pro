@@ -165,7 +165,7 @@ class EmailService {
   }
 
   async notifyAdminNewSignup({ businessName, email, ntn, city, companyId }) {
-    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'muhammadusmanirfan95@gmail.com';
+    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'aitsaamasif123@gmail.com';
     try {
       const appUrl = process.env.APP_URL || 'https://nizaam.com';
       const msg = {
