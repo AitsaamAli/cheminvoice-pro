@@ -161,6 +161,7 @@ app.delete('/api/users/:userId', verifyToken, userController.deactivateUser);
 
 // ── Admin (SUPERADMIN only) ───────────────────────────────────────────────────
 app.get('/api/admin/companies', verifyToken, adminController.listAllCompanies);
+app.patch('/api/admin/companies/:companyId/approve', verifyToken, adminController.approveCompany);
 app.patch('/api/admin/companies/:companyId/activate', verifyToken, adminController.activateCompany);
 app.patch('/api/admin/companies/:companyId/suspend', verifyToken, adminController.suspendCompany);
 

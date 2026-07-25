@@ -164,6 +164,70 @@ class EmailService {
     }
   }
 
+  async notifyAdminNewSignup({ businessName, email, ntn, city, companyId }) {
+    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'muhammadusmanirfan95@gmail.com';
+    try {
+      const appUrl = process.env.APP_URL || 'https://nizaam.com';
+      const msg = {
+        to: adminEmail,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@nizaam.com',
+        subject: `New Sign-up Request: ${businessName}`,
+        html: `
+          <html><body style="font-family:Arial,sans-serif;color:#333;max-width:580px;margin:0 auto;padding:20px">
+            <div style="background:#0C3D5E;padding:24px;border-radius:10px 10px 0 0">
+              <h2 style="color:white;margin:0;font-size:20px">New Sign-up Request</h2>
+              <p style="color:rgba(255,255,255,0.6);margin:6px 0 0;font-size:13px">Nizaam Invoicing Softwares</p>
+            </div>
+            <div style="background:#f7f8fa;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px">
+              <table style="width:100%;border-collapse:collapse;font-size:14px">
+                <tr><td style="padding:10px 0;color:#6b7280;width:140px">Business Name</td><td style="padding:10px 0;font-weight:600;color:#111">${businessName}</td></tr>
+                <tr><td style="padding:10px 0;color:#6b7280">Email</td><td style="padding:10px 0;color:#111">${email}</td></tr>
+                <tr><td style="padding:10px 0;color:#6b7280">NTN</td><td style="padding:10px 0;color:#111">${ntn || 'Not provided'}</td></tr>
+                <tr><td style="padding:10px 0;color:#6b7280">City</td><td style="padding:10px 0;color:#111">${city || 'Not provided'}</td></tr>
+              </table>
+              <a href="${appUrl}/admin" style="display:inline-block;margin-top:20px;background:#0C3D5E;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+                Review in Admin Panel →
+              </a>
+              <p style="margin-top:20px;font-size:12px;color:#9ca3af">Approve or reject this request from the Admin Panel.</p>
+            </div>
+          </body></html>
+        `,
+      };
+      await this._send(msg);
+    } catch (err) {
+      console.error('Admin notify email error:', err.message);
+    }
+  }
+
+  async sendApprovalEmail(recipientEmail, businessName) {
+    try {
+      const appUrl = process.env.APP_URL || 'https://nizaam.com';
+      const msg = {
+        to: recipientEmail,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@nizaam.com',
+        subject: 'Account Approved — Welcome to Nizaam Invoicing Softwares',
+        html: `
+          <html><body style="font-family:Arial,sans-serif;color:#333;max-width:580px;margin:0 auto;padding:20px">
+            <div style="background:#0C3D5E;padding:24px;border-radius:10px 10px 0 0">
+              <h2 style="color:white;margin:0">Account Approved!</h2>
+            </div>
+            <div style="background:#f7f8fa;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px">
+              <p style="font-size:15px">Dear <strong>${businessName}</strong>,</p>
+              <p style="font-size:14px;color:#555">Your account on <strong>Nizaam Invoicing Softwares</strong> has been approved. You can now log in and start creating FBR-compliant invoices.</p>
+              <a href="${appUrl}/login" style="display:inline-block;margin-top:16px;background:#0C3D5E;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+                Login to Dashboard →
+              </a>
+              <p style="margin-top:24px;font-size:12px;color:#9ca3af">Nizaam Invoicing Softwares · nizaam.com<br>FBR Compliant Digital Invoicing</p>
+            </div>
+          </body></html>
+        `,
+      };
+      await this._send(msg);
+    } catch (err) {
+      console.error('Approval email error:', err.message);
+    }
+  }
+
   generateInvoiceHTML(invoice) {
     const itemsHTML = invoice.items.map((item, idx) => `
       <tr>

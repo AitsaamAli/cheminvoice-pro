@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
+const emailService = require('../services/emailService');
 
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
@@ -27,18 +28,21 @@ const register = asyncHandler(async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
+  const bizName = businessName || `${firstName} ${lastName} Company`;
+
   const company = await prisma.company.create({
     data: {
-      businessName: businessName || `${firstName} ${lastName} Company`,
+      businessName: bizName,
       ntn: ntn || '0000000',
       strn: strn || '0000000000000',
       address: address || 'Pakistan',
       province: province || 'Punjab',
       city: city || 'Lahore',
+      subscriptionStatus: 'PENDING',
     },
   });
 
-  const user = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email,
       password: hashedPassword,
@@ -49,27 +53,39 @@ const register = asyncHandler(async (req, res) => {
     },
   });
 
-  const { accessToken, refreshToken } = generateTokens(user);
+  // Notify admin (fire-and-forget)
+  emailService.notifyAdminNewSignup({
+    businessName: bizName,
+    email,
+    ntn: ntn || '',
+    city: city || '',
+    companyId: company.id,
+  }).catch(() => {});
 
   res.status(201).json({
     success: true,
-    message: 'Registration successful',
-    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, companyId: user.companyId },
-    accessToken,
-    refreshToken,
+    pending: true,
+    message: 'Registration submitted. Our team will review and approve your account. You will receive an email confirmation.',
   });
 });
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { company: { select: { subscriptionStatus: true } } },
+  });
   if (!user) throw new AppError('Invalid credentials', 401);
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) throw new AppError('Invalid credentials', 401);
 
   if (!user.isActive) throw new AppError('Account is deactivated', 403);
+
+  if (user.company?.subscriptionStatus === 'PENDING') {
+    throw new AppError('PENDING_APPROVAL: Your account is awaiting admin approval. You will receive an email once approved.', 403);
+  }
 
   await prisma.user.update({
     where: { id: user.id },

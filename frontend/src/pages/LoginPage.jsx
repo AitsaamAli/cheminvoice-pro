@@ -39,6 +39,8 @@ export default function LoginPage() {
   const [tab, setTab] = useState('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registered, setRegistered] = useState(false);
+  const [pendingError, setPendingError] = useState(false);
   const navigate = useNavigate();
 
   const [login, setLogin] = useState({ email: '', password: '' });
@@ -52,7 +54,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setPendingError(false);
     try {
       const { data } = await axios.post(`${API_URL}/auth/login`, login);
       localStorage.setItem('accessToken', data.accessToken);
@@ -60,7 +62,12 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
+      const msg = err.response?.data?.error || '';
+      if (msg.startsWith('PENDING_APPROVAL:')) {
+        setPendingError(true);
+      } else {
+        setError(msg || 'Login failed. Please check your credentials.');
+      }
     } finally { setLoading(false); }
   };
 
@@ -69,10 +76,9 @@ export default function LoginPage() {
     setLoading(true); setError('');
     try {
       const { data } = await axios.post(`${API_URL}/auth/register`, reg);
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/');
+      if (data.pending) {
+        setRegistered(true);
+      }
     } catch (err) {
       const d = err.response?.data;
       const msg = d?.details?.[0]?.message || d?.error || 'Registration failed';
@@ -164,8 +170,38 @@ export default function LoginPage() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-accent">
               <span className="w-4 h-4"><AtomLogo /></span>
             </div>
-            <span className="font-display font-bold text-neutral-800">Nizaam.com</span>
+            <span className="font-display font-bold text-neutral-800">Nizaam Invoicing Softwares</span>
           </div>
+
+          {/* Registration submitted — pending approval screen */}
+          {registered ? (
+            <div className="bg-white rounded-2xl p-8 text-center" style={{ boxShadow: '0 4px 24px rgba(12,61,94,0.1)', border: '1px solid #DDE3EC' }}>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: '#D1FAE5' }}>
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-neutral-900 mb-2">Registration Submitted!</h2>
+              <p className="text-neutral-500 text-sm leading-relaxed mb-6">
+                Aap ka account review ke liye bhej diya gaya hai.<br />
+                Hum jald hi approve karein ge aur aap ko email milegi.
+              </p>
+              <div className="rounded-xl p-4 text-left" style={{ background: '#F0F9FF', border: '1px solid #BAE6FD' }}>
+                <p className="text-xs text-blue-700 font-semibold mb-1">Next Steps:</p>
+                <ul className="text-xs text-blue-600 space-y-1">
+                  <li>✓ Hum aap ki details verify karein ge</li>
+                  <li>✓ Approval ke baad email aayegi</li>
+                  <li>✓ Email mil ne ke baad yahan login karein</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => { setRegistered(false); setTab('login'); }}
+                className="mt-5 text-sm text-neutral-500 hover:text-neutral-800 underline"
+              >
+                Login page pe jayen
+              </button>
+            </div>
+          ) : (
 
           <div className="bg-white rounded-2xl p-7" style={{ boxShadow: '0 4px 24px rgba(12,61,94,0.1)', border: '1px solid #DDE3EC' }}>
             {/* Tab toggle */}
@@ -185,6 +221,18 @@ export default function LoginPage() {
               ))}
             </div>
 
+            {/* Pending approval error */}
+            {pendingError && (
+              <div className="rounded-xl p-4 mb-5 flex gap-3" style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="#D97706" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">Account pending approval</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Aap ka account abhi review mein hai. Approval ke baad email aayegi.</p>
+                </div>
+              </div>
+            )}
             {/* Error */}
             {error && (
               <div className="alert alert-error mb-5">
@@ -268,8 +316,9 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <button type="submit" disabled={loading} className="btn btn-accent btn-lg w-full mt-1">
-                  {loading ? <><Spinner /> Creating account…</> : 'Create Account & Start'}
+                  {loading ? <><Spinner /> Submitting…</> : 'Submit Registration Request'}
                 </button>
+                <p className="text-xs text-neutral-400 text-center mt-2">After registration, our team will review and approve your account.</p>
               </form>
             )}
 
@@ -277,6 +326,8 @@ export default function LoginPage() {
               🔒 256-bit encrypted · FBR licensed · Pakistan
             </p>
           </div>
+
+          )} {/* end registered conditional */}
         </div>
       </div>
     </div>
