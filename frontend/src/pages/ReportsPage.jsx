@@ -43,10 +43,13 @@ export default function ReportsPage() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'aging'
+  const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'aging' | 'stock'
   const [company, setCompany] = useState(null);
   const [pdfing, setPdfing] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(null);
+  const [allProducts, setAllProducts] = useState([]);
+  const [stockFilter, setStockFilter] = useState('all'); // 'all' | 'low' | 'out'
+  const [stockLoading, setStockLoading] = useState(false);
   const today = new Date();
   const [range, setRange] = useState({
     startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
@@ -57,6 +60,14 @@ export default function ReportsPage() {
     API.get('/auth/me').then(r => setCompany(r.data?.company || null)).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [range]);
+  useEffect(() => {
+    if (activeTab !== 'stock') return;
+    setStockLoading(true);
+    API.get(`/companies/${user.companyId}/products?take=200`)
+      .then(r => setAllProducts(r.data.products || []))
+      .catch(() => {})
+      .finally(() => setStockLoading(false));
+  }, [activeTab]);
 
   const handleMarkPaid = async (inv) => {
     setMarkingPaid(inv.id);
@@ -270,7 +281,7 @@ export default function ReportsPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         <button
           className={`btn btn-sm ${activeTab === 'invoices' ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setActiveTab('invoices')}
@@ -287,6 +298,12 @@ export default function ReportsPage() {
               {agingBuckets.reduce((s,b)=>s+b.items.length,0)}
             </span>
           )}
+        </button>
+        <button
+          className={`btn btn-sm ${activeTab === 'stock' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setActiveTab('stock')}
+        >
+          Stock Report
         </button>
       </div>
 
@@ -476,6 +493,155 @@ export default function ReportsPage() {
         )}
       </div>
       )}
+
+      {/* ── Stock Report Tab ── */}
+      {activeTab === 'stock' && (() => {
+        const tracked = allProducts.filter(p => p.trackStock);
+        const outOfStock = tracked.filter(p => p.stockQuantity <= 0);
+        const lowStock   = tracked.filter(p => p.stockQuantity > 0 && p.stockQuantity <= p.reorderLevel);
+        const okStock    = tracked.filter(p => p.stockQuantity > p.reorderLevel);
+        const totalValue = tracked.reduce((s, p) => s + p.stockQuantity * p.defaultSalePrice, 0);
+
+        const filtered = stockFilter === 'out' ? outOfStock
+          : stockFilter === 'low' ? lowStock
+          : tracked;
+
+        const stockBadge = (p) => {
+          if (p.stockQuantity <= 0)                    return <span className="badge badge-error">Out of Stock</span>;
+          if (p.stockQuantity <= p.reorderLevel)       return <span className="badge badge-warning">Low Stock</span>;
+          return <span className="badge badge-success">OK</span>;
+        };
+
+        const downloadStockCSV = () => {
+          const header = ['Product', 'Code', 'UoM', 'Stock Qty', 'Reorder Level', 'Status', 'Unit Price', 'Stock Value'];
+          const rows = filtered.map(p => [
+            p.productName, p.productCode, p.unitOfMeasure,
+            p.stockQuantity, p.reorderLevel,
+            p.stockQuantity <= 0 ? 'Out of Stock' : p.stockQuantity <= p.reorderLevel ? 'Low Stock' : 'OK',
+            p.defaultSalePrice.toFixed(2),
+            (p.stockQuantity * p.defaultSalePrice).toFixed(2),
+          ]);
+          const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+          const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url; a.download = `stock_report_${new Date().toISOString().split('T')[0]}.csv`;
+          document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(url);
+        };
+
+        return (
+          <div className="space-y-5 animate-fade-up">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: 'Tracked Products', value: tracked.length, color: '#2563EB', big: true },
+                { label: 'Out of Stock',     value: outOfStock.length, color: '#DC2626', big: true },
+                { label: 'Low Stock',        value: lowStock.length,   color: '#D97706', big: true },
+                { label: 'Total Stock Value',value: fmt(totalValue),   color: '#059669' },
+              ].map((s, i) => (
+                <div key={s.label} className={`stat-card animate-fade-up anim-delay-${i+1}`}>
+                  <div className="stat-label">{s.label}</div>
+                  <div className="stat-value" style={{ color: s.color, fontSize: s.big ? '2.25rem' : '1.1rem' }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Filter + actions */}
+            <div className="card">
+              <div className="card-header">
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { key: 'all', label: `All (${tracked.length})` },
+                    { key: 'low', label: `Low Stock (${lowStock.length})` },
+                    { key: 'out', label: `Out of Stock (${outOfStock.length})` },
+                  ].map(f => (
+                    <button key={f.key}
+                      className={`btn btn-sm ${stockFilter === f.key ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setStockFilter(f.key)}
+                    >{f.label}</button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={downloadStockCSV} disabled={filtered.length === 0} className="btn btn-outline btn-sm gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    CSV
+                  </button>
+                  <button onClick={() => navigate('/products')} className="btn btn-outline btn-sm">
+                    Manage →
+                  </button>
+                </div>
+              </div>
+
+              {stockLoading ? (
+                <div className="p-6 space-y-3">{[1,2,3,4].map(i => <div key={i} className="skeleton h-11" />)}</div>
+              ) : tracked.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon-box">
+                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                  </div>
+                  <div className="empty-title">Stock tracking not enabled</div>
+                  <div className="empty-desc mb-4">Products page par products ka stock tracking enable karein</div>
+                  <button onClick={() => navigate('/products')} className="btn btn-primary btn-sm">Go to Products</button>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-title" style={{ color: '#059669' }}>
+                    {stockFilter === 'out' ? 'No out-of-stock products!' : 'No low-stock products!'}
+                  </div>
+                  <div className="empty-desc">Sab products ka stock level theek hai</div>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Code</th>
+                          <th className="t-right">Stock Qty</th>
+                          <th className="t-right">Reorder Level</th>
+                          <th className="t-center">Status</th>
+                          <th className="t-right">Unit Price</th>
+                          <th className="t-right">Stock Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map(p => (
+                          <tr key={p.id}>
+                            <td className="font-semibold text-neutral-800">{p.productName}</td>
+                            <td className="text-xs text-neutral-500 font-numeric">{p.productCode}</td>
+                            <td className="t-right font-numeric font-bold" style={{
+                              color: p.stockQuantity <= 0 ? '#DC2626' : p.stockQuantity <= p.reorderLevel ? '#D97706' : '#059669'
+                            }}>
+                              {fmtN(p.stockQuantity)} {p.unitOfMeasure}
+                            </td>
+                            <td className="t-right font-numeric text-neutral-500">{fmtN(p.reorderLevel)}</td>
+                            <td className="t-center">{stockBadge(p)}</td>
+                            <td className="t-right font-numeric text-sm">{fmt(p.defaultSalePrice)}</td>
+                            <td className="t-right font-numeric font-semibold">{fmt(p.stockQuantity * p.defaultSalePrice)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="border-t border-neutral-100 bg-neutral-50 px-4 py-3 flex justify-end">
+                    <div className="text-right">
+                      <div className="text-xs text-neutral-500 mb-0.5">Total Stock Value</div>
+                      <div className="font-display font-bold text-primary font-numeric text-lg">
+                        {fmt(filtered.reduce((s, p) => s + p.stockQuantity * p.defaultSalePrice, 0))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </Layout>
   );
 }
