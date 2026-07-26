@@ -42,7 +42,7 @@ const register = asyncHandler(async (req, res) => {
     },
   });
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       email,
       password: hashedPassword,
@@ -51,6 +51,12 @@ const register = asyncHandler(async (req, res) => {
       companyId: company.id,
       role: 'ADMIN',
     },
+  });
+
+  // Membership row for the home company — source of truth for role/access
+  // once multi-company membership is in play (see switchCompany/inviteUser).
+  await prisma.companyMembership.create({
+    data: { userId: user.id, companyId: company.id, role: 'ADMIN' },
   });
 
   // Notify admin (fire-and-forget)
@@ -83,6 +89,17 @@ const login = asyncHandler(async (req, res) => {
 
   if (!user.isActive) throw new AppError('Account is deactivated', 403);
 
+  // Multi-tenant: role for the home company is sourced from CompanyMembership
+  // once one exists; falls back to the legacy User.role for older accounts
+  // that predate memberships (e.g. before a backfill has run).
+  const homeMembership = await prisma.companyMembership.findUnique({
+    where: { userId_companyId: { userId: user.id, companyId: user.companyId } },
+  });
+  if (homeMembership && !homeMembership.isActive) {
+    throw new AppError('Account is deactivated', 403);
+  }
+  const effectiveRole = homeMembership?.role || user.role;
+
   if (user.company?.subscriptionStatus === 'PENDING') {
     throw new AppError('PENDING_APPROVAL: Your account is awaiting admin approval. You will receive an email once approved.', 403);
   }
@@ -92,13 +109,74 @@ const login = asyncHandler(async (req, res) => {
     data: { lastLogin: new Date() },
   });
 
-  const { accessToken, refreshToken } = generateTokens(user);
+  const { accessToken, refreshToken } = generateTokens({ ...user, role: effectiveRole });
+
+  // Other companies this login can switch into (workspace switcher).
+  const memberships = await prisma.companyMembership.findMany({
+    where: { userId: user.id, isActive: true },
+    include: { company: { select: { businessName: true } } },
+  });
+  const companies = memberships.map(m => ({
+    companyId: m.companyId,
+    businessName: m.company.businessName,
+    role: m.role,
+    isHome: m.companyId === user.companyId,
+  }));
 
   res.json({
     success: true,
-    user: { id: user.id, email: user.email, role: user.role, companyId: user.companyId },
+    user: { id: user.id, email: user.email, role: effectiveRole, companyId: user.companyId },
+    companies,
     accessToken,
     refreshToken,
+  });
+});
+
+// ── Switch active company (multi-tenant) ──────────────────────────────────────
+const switchCompany = asyncHandler(async (req, res) => {
+  const { companyId } = req.body;
+  if (!companyId) throw new AppError('companyId required', 400);
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  if (!user || !user.isActive) throw new AppError('Account is deactivated', 403);
+
+  const membership = await prisma.companyMembership.findUnique({
+    where: { userId_companyId: { userId: req.user.id, companyId } },
+    include: { company: { select: { subscriptionStatus: true } } },
+  });
+  if (!membership || !membership.isActive) {
+    throw new AppError('Is company tak aap ki access nahi hai', 403);
+  }
+  if (membership.company.subscriptionStatus === 'SUSPENDED') {
+    throw new AppError('Is company ka account suspend hai', 403);
+  }
+
+  const { accessToken, refreshToken } = generateTokens({
+    id: user.id, email: user.email, role: membership.role, companyId,
+  });
+
+  res.json({
+    success: true,
+    user: { id: user.id, email: user.email, role: membership.role, companyId },
+    accessToken,
+    refreshToken,
+  });
+});
+
+// ── List companies this login can access ──────────────────────────────────────
+const listMyCompanies = asyncHandler(async (req, res) => {
+  const memberships = await prisma.companyMembership.findMany({
+    where: { userId: req.user.id, isActive: true },
+    include: { company: { select: { businessName: true } } },
+  });
+
+  res.json({
+    companies: memberships.map(m => ({
+      companyId: m.companyId,
+      businessName: m.company.businessName,
+      role: m.role,
+      isHome: m.companyId === req.user.companyId,
+    })),
   });
 });
 
@@ -145,4 +223,6 @@ module.exports = {
   refreshAccessToken,
   logout,
   getCurrentUser,
+  switchCompany,
+  listMyCompanies,
 };

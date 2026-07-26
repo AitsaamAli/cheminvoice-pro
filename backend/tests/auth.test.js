@@ -4,6 +4,7 @@ const request = require('supertest');
 jest.mock('../src/lib/prisma', () => ({
   user: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
   company: { create: jest.fn() },
+  companyMembership: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
   $disconnect: jest.fn(),
 }));
 jest.mock('bcryptjs', () => ({
@@ -19,6 +20,13 @@ const { adminToken, expiredToken, tamperedToken, mockUser } = require('./helpers
 const VALID_USER = mockUser();
 
 describe('Auth & Session (TC-A001–A012)', () => {
+
+  beforeEach(() => {
+    // Default: no membership row yet (pre-backfill account) — login() falls
+    // back to the legacy User.role/isActive, matching pre-multi-tenant behavior.
+    prisma.companyMembership.findUnique.mockResolvedValue(null);
+    prisma.companyMembership.findMany.mockResolvedValue([]);
+  });
 
   // TC-A001
   it('A-001: login with valid credentials returns tokens', async () => {
@@ -172,5 +180,88 @@ describe('Auth & Session (TC-A001–A012)', () => {
     });
 
     expect(res.status).toBe(403);
+  });
+
+  // TC-A013: Login uses the CompanyMembership role when one exists (multi-tenant)
+  it('A-013: login resolves role from CompanyMembership over the legacy User.role', async () => {
+    prisma.user.findUnique.mockResolvedValue(VALID_USER); // User.role = ADMIN
+    bcrypt.compare.mockResolvedValue(true);
+    prisma.user.update.mockResolvedValue(VALID_USER);
+    prisma.companyMembership.findUnique.mockResolvedValue({ role: 'ACCOUNTANT', isActive: true });
+    prisma.companyMembership.findMany.mockResolvedValue([
+      { companyId: VALID_USER.companyId, role: 'ACCOUNTANT', company: { businessName: 'Test Chemicals Ltd' } },
+    ]);
+
+    const res = await request(app).post('/api/auth/login').send({
+      email: 'admin@companya.com',
+      password: 'Password123!',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.role).toBe('ACCOUNTANT');
+    expect(res.body.companies).toHaveLength(1);
+    expect(res.body.companies[0].isHome).toBe(true);
+  });
+
+  // TC-A014: Login blocked when the home-company membership itself is inactive
+  it('A-014: login returns 403 when the CompanyMembership for the home company is inactive', async () => {
+    prisma.user.findUnique.mockResolvedValue(VALID_USER);
+    bcrypt.compare.mockResolvedValue(true);
+    prisma.companyMembership.findUnique.mockResolvedValue({ role: 'ADMIN', isActive: false });
+
+    const res = await request(app).post('/api/auth/login').send({
+      email: 'admin@companya.com',
+      password: 'Password123!',
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  // TC-A015: switch-company succeeds for an active membership and returns new tokens
+  it('A-015: switch-company returns a new token scoped to the target company', async () => {
+    prisma.user.findUnique.mockResolvedValue(VALID_USER);
+    prisma.companyMembership.findUnique.mockResolvedValue({
+      role: 'ACCOUNTANT', isActive: true, company: { subscriptionStatus: 'ACTIVE' },
+    });
+
+    const res = await request(app)
+      .post('/api/auth/switch-company')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ companyId: 'company-c-id-003' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.accessToken).toBeDefined();
+    expect(res.body.user.companyId).toBe('company-c-id-003');
+    expect(res.body.user.role).toBe('ACCOUNTANT');
+  });
+
+  // TC-A016: switch-company rejects a company the user isn't a member of
+  it('A-016: switch-company returns 403 for a company with no membership', async () => {
+    prisma.user.findUnique.mockResolvedValue(VALID_USER);
+    prisma.companyMembership.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/auth/switch-company')
+      .set('Authorization', `Bearer ${adminToken()}`)
+      .send({ companyId: 'company-not-a-member-id' });
+
+    expect(res.status).toBe(403);
+  });
+
+  // TC-A017: my-companies lists active memberships for the logged-in user
+  it('A-017: my-companies returns the caller\'s active memberships', async () => {
+    prisma.companyMembership.findMany.mockResolvedValue([
+      { companyId: 'company-a-id-001', role: 'ADMIN', company: { businessName: 'Test Chemicals Ltd' } },
+      { companyId: 'company-c-id-003', role: 'VIEWER', company: { businessName: 'Second Client Ltd' } },
+    ]);
+
+    const res = await request(app)
+      .get('/api/auth/my-companies')
+      .set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.companies).toHaveLength(2);
+    expect(res.body.companies[0].isHome).toBe(true);
+    expect(res.body.companies[1].isHome).toBe(false);
   });
 });

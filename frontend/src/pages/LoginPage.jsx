@@ -29,7 +29,7 @@ const AtomLogo = () => (
 );
 
 const features = [
-  { icon: '🏛️', title: 'FBR IRIS Compliant', desc: 'SRO 1413(I)/2025 · All 28 scenarios · Auto tax' },
+  { icon: '🏛️', title: 'FBR IRIS Compliant', desc: 'SRO 1413(I)/2025 · Real-time submission · Auto tax' },
   { icon: '💰', title: 'Further Tax Automation', desc: 'SN002 — 3% auto-added for unregistered buyers' },
   { icon: '📊', title: 'Monthly Return Export', desc: 'Breakdown by tax rate · CSV + PDF ready' },
   { icon: '🔐', title: 'Enterprise Security', desc: 'JWT auth · IDOR protection · Audit logs' },

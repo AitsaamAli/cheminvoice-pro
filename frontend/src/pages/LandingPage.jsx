@@ -24,6 +24,7 @@ const services = [
     desc: 'Fast billing at the counter. Barcode scanning, cash & card payments, receipt printing, daily sales reports.',
     color: '#7C3AED',
     bg: '#F5F3FF',
+    via: 'Nizaam FMS — desktop app',
   },
   {
     icon: (
@@ -36,6 +37,7 @@ const services = [
     desc: 'Full business management — accounts, inventory, HR, payroll, purchases, and sales in one integrated platform.',
     color: '#059669',
     bg: '#ECFDF5',
+    via: 'Nizaam FMS — desktop app',
   },
   {
     icon: (
@@ -45,7 +47,7 @@ const services = [
     ),
     title: 'Inventory Management',
     urdu: 'اسٹاک مینجمنٹ',
-    desc: 'Real-time stock tracking, reorder alerts, HS codes, MRP management, and multi-warehouse support.',
+    desc: 'Real-time stock tracking, reorder alerts, HS codes, and MRP management. Multi-location warehousing via Nizaam FMS.',
     color: '#D97706',
     bg: '#FFFBEB',
   },
@@ -103,11 +105,11 @@ const plans = [
   },
   {
     name: 'Enterprise',
-    price: 'Custom',
-    period: '',
+    price: 'PKR 7,999',
+    period: '/ month onwards',
     highlight: false,
     badge: null,
-    perks: ['Everything in Professional', 'POS integration', 'ERP modules', 'Unlimited users', 'Dedicated onboarding', 'WhatsApp support', 'SLA uptime'],
+    perks: ['Everything in Professional', 'POS integration', 'ERP modules', 'Unlimited users', 'Dedicated onboarding', 'WhatsApp support', 'SLA uptime', 'Custom quote for multi-branch'],
     cta: 'Contact Us',
   },
 ];
@@ -202,7 +204,14 @@ export default function LandingPage() {
                   style={{ background: s.bg, color: s.color }}>
                   {s.icon}
                 </div>
-                <h3 className="font-bold text-neutral-900 mb-0.5">{s.title}</h3>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h3 className="font-bold text-neutral-900">{s.title}</h3>
+                  {s.via && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-neutral-200 text-neutral-500 whitespace-nowrap">
+                      {s.via}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-neutral-400 mb-2" style={{ direction: 'rtl', fontFamily: 'system-ui' }}>{s.urdu}</p>
                 <p className="text-sm text-neutral-500 leading-relaxed">{s.desc}</p>
               </div>
@@ -216,7 +225,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-8 text-center">
           {[
             { val: 'FBR V1.12', label: 'Certified Compliant' },
-            { val: '28', label: 'Invoice Scenarios Covered' },
+            { val: '7', label: 'Invoice Scenarios Live' },
             { val: '3%', label: 'Further Tax Auto-Applied' },
             { val: '< 2s', label: 'Invoice Generation Time' },
             { val: 'SSL', label: 'Encrypted & Secure' },

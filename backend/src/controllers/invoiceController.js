@@ -5,29 +5,20 @@ const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const FBR = require('../config/fbr');
 
 const MAX_TAKE = 50;
+const MAX_BULK_INVOICES = 50;
 
-// ── Create invoice ───────────────────────────────────────────────────────────
-const createInvoice = asyncHandler(async (req, res) => {
-  const { companyId } = req.params;
-  const { customerId, invoiceDate, invoiceType, items, paymentTerms, paymentMethod, deliveryTerms, remarks, referenceInvoiceNo } = req.body;
+// ── Shared core: build + persist one invoice ──────────────────────────────────
+// Used by both createInvoice (single) and bulkCreateInvoices (loops this per
+// item, sequentially, so invoice numbers stay strictly sequential — see INV-3).
+const buildAndPersistInvoice = async (companyId, userId, company, body) => {
+  const { customerId, invoiceDate, invoiceType, items, paymentTerms, paymentMethod, deliveryTerms, remarks, referenceInvoiceNo } = body;
 
   // ✅ FIX: N+1 — fetch all products in ONE query instead of one per item
   const productIds = [...new Set(items.map(i => i.productId))];
-  const [company, customer, productsRaw] = await Promise.all([
-    prisma.company.findUnique({ where: { id: companyId } }),
+  const [customer, productsRaw] = await Promise.all([
     prisma.customer.findUnique({ where: { id: customerId } }),
     prisma.product.findMany({ where: { id: { in: productIds }, isActive: true } }),
   ]);
-
-  if (!company) throw new AppError('Company not found', 404);
-
-  // Subscription gate
-  if (company.subscriptionStatus === 'SUSPENDED') {
-    throw new AppError('Your account is suspended. Please contact support to reactivate.', 403);
-  }
-  if (company.subscriptionStatus === 'TRIAL' && company.trialInvoicesUsed >= company.trialInvoiceLimit) {
-    throw new AppError(`Free trial limit reached (${company.trialInvoiceLimit} invoices). Please upgrade to continue.`, 402);
-  }
 
   if (!customer) throw new AppError('Customer not found', 404);
 
@@ -108,8 +99,22 @@ const createInvoice = asyncHandler(async (req, res) => {
   if (['DEBIT_NOTE', 'CREDIT_NOTE'].includes(invoiceType) && referenceInvoiceNo) {
     const originalInv = await prisma.invoice.findFirst({
       where: { invoiceNumber: referenceInvoiceNo, companyId },
-      select: { fbrInvoiceNumber: true },
+      select: { fbrInvoiceNumber: true, invoiceDate: true },
     });
+
+    // INV-10: FBR only allows a credit/debit note within N days of the original
+    // invoice's date. Enforced only when the original is found locally — an
+    // unmatched reference number falls through unchanged (best-effort IRN lookup).
+    if (originalInv?.invoiceDate) {
+      const originalAgeDays = (Date.now() - new Date(originalInv.invoiceDate).getTime()) / 86400000;
+      if (originalAgeDays > FBR.creditDebitNoteWindowDays) {
+        throw new AppError(
+          `Credit/Debit note issue nahi ho sakti — FBR ka ${FBR.creditDebitNoteWindowDays} din ka window guzar gaya hai (original invoice ${Math.round(originalAgeDays)} din purani hai)`,
+          400
+        );
+      }
+    }
+
     referenceInvoiceIRN = originalInv?.fbrInvoiceNumber || null;
   }
 
@@ -152,7 +157,7 @@ const createInvoice = asyncHandler(async (req, res) => {
         paymentTerms: paymentTerms || null,
         deliveryTerms: deliveryTerms || null,
         remarks: remarks || null,
-        createdByUserId: req.user.id,
+        createdByUserId: userId,
         items: { create: invoiceItems },
       },
       include: { items: true },
@@ -168,7 +173,68 @@ const createInvoice = asyncHandler(async (req, res) => {
     }).catch(() => {});
   }
 
+  return invoice;
+};
+
+// ── Company-level gate: suspension + trial limit ──────────────────────────────
+const assertCanCreateInvoice = (company, countThisRequest = 1) => {
+  if (company.subscriptionStatus === 'SUSPENDED') {
+    throw new AppError('Your account is suspended. Please contact support to reactivate.', 403);
+  }
+  if (company.subscriptionStatus === 'TRIAL' && company.trialInvoicesUsed + countThisRequest > company.trialInvoiceLimit) {
+    throw new AppError(`Free trial limit reached (${company.trialInvoiceLimit} invoices). Please upgrade to continue.`, 402);
+  }
+};
+
+// ── Create invoice ───────────────────────────────────────────────────────────
+const createInvoice = asyncHandler(async (req, res) => {
+  const { companyId } = req.params;
+
+  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  if (!company) throw new AppError('Company not found', 404);
+  assertCanCreateInvoice(company, 1);
+
+  const invoice = await buildAndPersistInvoice(companyId, req.user.id, company, req.body);
   res.status(201).json({ success: true, message: 'Invoice created successfully', invoice });
+});
+
+// ── Bulk create invoices ───────────────────────────────────────────────────────
+// Accepts { invoices: [ <same shape as createInvoice body>, ... ] }, up to
+// MAX_BULK_INVOICES per request. Processed sequentially (not Promise.all) so
+// the atomic invoice-number counter stays strictly sequential (INV-3). One
+// bad row doesn't abort the batch — each result reports success/failure so a
+// POS/ERP integrator can retry just the failed rows.
+const bulkCreateInvoices = asyncHandler(async (req, res) => {
+  const { companyId } = req.params;
+  const { invoices } = req.body;
+
+  if (!Array.isArray(invoices) || invoices.length === 0) {
+    throw new AppError('invoices array required', 400);
+  }
+  if (invoices.length > MAX_BULK_INVOICES) {
+    throw new AppError(`Bulk request mein ek waqt mein ${MAX_BULK_INVOICES} se zyada invoices nahi bhej sakte`, 400);
+  }
+
+  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  if (!company) throw new AppError('Company not found', 404);
+  assertCanCreateInvoice(company, invoices.length);
+
+  const results = [];
+  for (let i = 0; i < invoices.length; i++) {
+    try {
+      const invoice = await buildAndPersistInvoice(companyId, req.user.id, company, invoices[i]);
+      results.push({ index: i, success: true, invoice });
+    } catch (err) {
+      results.push({ index: i, success: false, error: err.message || 'Invoice create failed' });
+    }
+  }
+
+  const succeeded = results.filter(r => r.success).length;
+  res.status(207).json({
+    success: succeeded === invoices.length,
+    message: `${succeeded}/${invoices.length} invoices created`,
+    results,
+  });
 });
 
 // ── Submit to FBR ────────────────────────────────────────────────────────────
@@ -367,4 +433,4 @@ const updatePayment = asyncHandler(async (req, res) => {
   res.json({ success: true, paymentStatus: updated.paymentStatus, paidAmount: updated.paidAmount });
 });
 
-module.exports = { createInvoice, submitToFBR, cancelInvoice, updatePayment, getInvoice, generatePDF, listInvoices };
+module.exports = { createInvoice, bulkCreateInvoices, submitToFBR, cancelInvoice, updatePayment, getInvoice, generatePDF, listInvoices };

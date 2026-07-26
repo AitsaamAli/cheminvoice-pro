@@ -21,6 +21,28 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  memberships CompanyMembership[]
+
+  @@index([companyId])
+}
+
+// Multi-tenant membership: lets one login access more than one Company
+// (e.g. an accountant working across several clients). `User.companyId`/`role`
+// stay as the "home" company for backward compatibility with existing single-
+// company accounts; CompanyMembership is the source of truth for role and
+// active-status at any given company once a membership row exists for it.
+model CompanyMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  role      String   @default("VIEWER")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, companyId])
+  @@index([userId])
   @@index([companyId])
 }
 
@@ -49,12 +71,13 @@ model Company {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  users      User[]
-  customers  Customer[]
-  products   Product[]
-  invoices   Invoice[]
-  quotations Quotation[]
-  taxConfigs TaxConfig[]
+  users       User[]
+  memberships CompanyMembership[]
+  customers   Customer[]
+  products    Product[]
+  invoices    Invoice[]
+  quotations  Quotation[]
+  taxConfigs  TaxConfig[]
 
   @@index([ntn])
 }

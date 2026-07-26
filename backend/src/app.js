@@ -90,9 +90,12 @@ app.post('/api/auth/login', authLimiter, validate('loginUser'), authController.l
 app.post('/api/auth/refresh', authLimiter, authController.refreshAccessToken);
 app.get('/api/auth/me', verifyToken, authController.getCurrentUser);
 app.post('/api/auth/logout', verifyToken, authController.logout);
+app.get('/api/auth/my-companies', verifyToken, authController.listMyCompanies);
+app.post('/api/auth/switch-company', verifyToken, authController.switchCompany);
 
 // ── Invoices ──────────────────────────────────────────────────────────────────
 app.post('/api/companies/:companyId/invoices', verifyToken, requireCompanyAccess, validate('createInvoice'), invoiceController.createInvoice);
+app.post('/api/companies/:companyId/invoices/bulk', verifyToken, requireCompanyAccess, validate('bulkCreateInvoice'), invoiceController.bulkCreateInvoices);
 app.get('/api/companies/:companyId/invoices', verifyToken, requireCompanyAccess, invoiceController.listInvoices);
 app.get('/api/invoices/:invoiceId', verifyToken, invoiceController.getInvoice);
 app.post('/api/invoices/:invoiceId/submit-fbr', verifyToken, invoiceController.submitToFBR);
@@ -103,6 +106,7 @@ app.get('/api/invoices/:invoiceId/pdf', verifyToken, invoiceController.generateP
 // ── Customers ─────────────────────────────────────────────────────────────────
 app.post('/api/companies/:companyId/customers', verifyToken, requireCompanyAccess, validate('createCustomer'), customerController.createCustomer);
 app.get('/api/companies/:companyId/customers', verifyToken, requireCompanyAccess, customerController.listCustomers);
+app.get('/api/companies/:companyId/verify-registration/:regNo', verifyToken, requireCompanyAccess, customerController.verifyRegistration);
 app.get('/api/customers/:customerId', verifyToken, customerController.getCustomer);
 app.put('/api/customers/:customerId', verifyToken, customerController.updateCustomer);
 app.delete('/api/customers/:customerId', verifyToken, customerController.deleteCustomer);

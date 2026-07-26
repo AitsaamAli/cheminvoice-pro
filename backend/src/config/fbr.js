@@ -44,6 +44,9 @@ const FBR = {
   // INV-7: FBR allows cancellation only within 72 hours of invoice generation
   cancelWindowHours: 72,
 
+  // INV-10: FBR allows a credit/debit note only within 180 days of the original invoice
+  creditDebitNoteWindowDays: 180,
+
   // Max retries before the offline queue gives up permanently
   queueMaxRetries: 5,
 
@@ -52,6 +55,15 @@ const FBR = {
 
   // [VERIFY] UOM codes accepted by FBR DI API — confirm against reference API
   uomCodes: ['KGM', 'LTR', 'TNE', 'DRM', 'BAG', 'NUM'],
+
+  // [VERIFY] Reference/lookup API base + registration-type endpoint. Path and
+  // response field names are best-effort from public PRAL DI integration
+  // guides — confirm against the latest PRAL DI API PDF before treating a
+  // result as more than a soft hint (see fbrService.verifyRegistration).
+  referenceBaseUrl: process.env.FBR_REFERENCE_URL || 'https://gw.fbr.gov.pk/pdi/v1',
+  referenceEndpoints: {
+    registrationType: '/Get_Reg_Type', // [VERIFY]
+  },
 
   // [VERIFY] Valid sales tax rates for chemical sector under current SRO schedule
   allowedTaxRates: [0, 5, 10, 18],

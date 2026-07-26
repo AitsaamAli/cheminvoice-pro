@@ -12,9 +12,13 @@ jest.mock('../src/lib/prisma', () => ({
   },
   $disconnect: jest.fn(),
 }));
+jest.mock('../src/services/fbrService', () => ({
+  verifyRegistration: jest.fn(),
+}));
 
 const app = require('../src/app');
 const prisma = require('../src/lib/prisma');
+const fbrService = require('../src/services/fbrService');
 const {
   adminToken, companyBToken,
   COMPANY_A, COMPANY_B,
@@ -180,5 +184,33 @@ describe('Customer Management (TC-C001–C012)', () => {
       .send(customerPayload({ contactPhone: 'A'.repeat(31) }));
 
     expect(res.status).toBe(400);
+  });
+
+  // TC-C013: verify-registration proxies fbrService and returns its result
+  it('C-013: verify-registration returns the registration type for a valid NTN', async () => {
+    fbrService.verifyRegistration.mockResolvedValue({
+      verified: true, registrationType: 'REGISTERED', businessName: 'Test Buyer Pvt Ltd',
+    });
+
+    const res = await request(app)
+      .get(`${BASE.replace('/customers', '')}/verify-registration/1234567`)
+      .set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.verified).toBe(true);
+    expect(res.body.registrationType).toBe('REGISTERED');
+    expect(fbrService.verifyRegistration).toHaveBeenCalledWith('1234567');
+  });
+
+  // TC-C014: verify-registration never throws — an unreachable FBR returns verified:false
+  it('C-014: verify-registration returns verified:false (not a 500) when FBR is unreachable', async () => {
+    fbrService.verifyRegistration.mockResolvedValue({ verified: false, reason: 'FBR server se connection nahi hua' });
+
+    const res = await request(app)
+      .get(`${BASE.replace('/customers', '')}/verify-registration/1234567`)
+      .set(authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.verified).toBe(false);
   });
 });

@@ -249,6 +249,47 @@ class FBRService {
     return FBR.uomCodes.includes(uom) ? uom : 'NUM';
   }
 
+  /**
+   * Real-time buyer registration check against FBR's reference API — does the
+   * NTN/CNIC exist and is it REGISTERED or UNREGISTERED for sales tax.
+   * [VERIFY] Endpoint path + response field names (see config/fbr.js) — this
+   * is best-effort until confirmed against the live PRAL API, so callers must
+   * treat a failed/unreachable check as "unknown," never as "invalid." It
+   * never blocks invoice creation on its own — format validation (INV-6)
+   * remains the hard gate.
+   */
+  async verifyRegistration(regNo) {
+    if (!regNo || !/^([0-9]{7}|[0-9]{13})$/.test(regNo)) {
+      return { verified: false, reason: 'NTN 7 digits ya CNIC 13 digits hona chahiye' };
+    }
+    try {
+      const response = await axios.get(
+        `${FBR.referenceBaseUrl}${FBR.referenceEndpoints.registrationType}`,
+        {
+          params: { REGNO: regNo },
+          headers: { 'Authorization': `Bearer ${FBR.token}` },
+          timeout: FBR.timeoutMs,
+        }
+      );
+      const data = response.data || {};
+      // [VERIFY] field names below — confirm against the live response shape.
+      const statusStr = String(data.STATUS || data.status || data.REGISTRATION_TYPE || '').toUpperCase();
+      const registrationType = statusStr.includes('UN') ? 'UNREGISTERED'
+        : statusStr.includes('REG') ? 'REGISTERED'
+        : null;
+
+      return {
+        verified: true,
+        registrationType,
+        businessName: data.NAME || data.businessName || data.REGISTERED_NAME || null,
+        raw: data,
+      };
+    } catch (error) {
+      console.warn('[FBR] Registration verify unreachable:', error.message);
+      return { verified: false, reason: FBR.translateError(error.message) };
+    }
+  }
+
   validateInvoiceForFBR(invoice, company, customer) {
     const errors = [];
 

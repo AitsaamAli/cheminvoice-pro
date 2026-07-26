@@ -152,6 +152,74 @@ describe('Invoice Lifecycle (TC-I001–I022)', () => {
     expect(res.body.invoice.invoiceType).toBe('DEBIT_NOTE');
   });
 
+  // TC-I007b: INV-10 — CREDIT_NOTE rejected when local original invoice is > 180 days old
+  it('I-007b: CREDIT_NOTE against an original invoice older than 180 days is rejected', async () => {
+    const oldDate = new Date(Date.now() - 200 * 86400000); // 200 days ago
+    prisma.invoice.findFirst.mockResolvedValue({ fbrInvoiceNumber: 'IRN-OLD-001', invoiceDate: oldDate });
+
+    const res = await request(app)
+      .post(BASE)
+      .set(authHeader())
+      .send(invoicePayload({ invoiceType: 'CREDIT_NOTE', referenceInvoiceNo: '1234567-2026-000001' }));
+
+    expect(res.status).toBe(400);
+    expect(res.body.error || res.body.message).toMatch(/180/);
+  });
+
+  // TC-I007c: INV-10 — CREDIT_NOTE allowed when local original invoice is within 180 days
+  it('I-007c: CREDIT_NOTE against an original invoice within 180 days succeeds', async () => {
+    const recentDate = new Date(Date.now() - 30 * 86400000); // 30 days ago
+    prisma.invoice.findFirst.mockResolvedValue({ fbrInvoiceNumber: 'IRN-RECENT-001', invoiceDate: recentDate });
+    setupTransactionMock(mockInvoice({ invoiceType: 'CREDIT_NOTE', referenceInvoiceNo: '1234567-2026-000001' }));
+
+    const res = await request(app)
+      .post(BASE)
+      .set(authHeader())
+      .send(invoicePayload({ invoiceType: 'CREDIT_NOTE', referenceInvoiceNo: '1234567-2026-000001' }));
+
+    expect(res.status).toBe(201);
+  });
+
+  // TC-I023: bulk create — all items succeed
+  it('I-023: bulk create with 2 valid invoices returns 207 with 2 successes', async () => {
+    const res = await request(app)
+      .post(`${BASE}/bulk`)
+      .set(authHeader())
+      .send({ invoices: [invoicePayload(), invoicePayload()] });
+
+    expect(res.status).toBe(207);
+    expect(res.body.results).toHaveLength(2);
+    expect(res.body.results.every(r => r.success)).toBe(true);
+    expect(res.body.message).toBe('2/2 invoices created');
+  });
+
+  // TC-I024: bulk create — one bad row doesn't abort the batch
+  it('I-024: bulk create reports per-row failure without aborting the batch', async () => {
+    prisma.customer.findUnique
+      .mockResolvedValueOnce(mockCustomer())
+      .mockResolvedValueOnce(null); // second row: customer not found
+
+    const res = await request(app)
+      .post(`${BASE}/bulk`)
+      .set(authHeader())
+      .send({ invoices: [invoicePayload(), invoicePayload()] });
+
+    expect(res.status).toBe(207);
+    expect(res.body.results[0].success).toBe(true);
+    expect(res.body.results[1].success).toBe(false);
+    expect(res.body.results[1].error).toMatch(/Customer not found/);
+  });
+
+  // TC-I025: bulk create — over the batch cap is rejected before touching the DB
+  it('I-025: bulk create with 51 invoices returns 400', async () => {
+    const res = await request(app)
+      .post(`${BASE}/bulk`)
+      .set(authHeader())
+      .send({ invoices: Array(51).fill(invoicePayload()) });
+
+    expect(res.status).toBe(400);
+  });
+
   // TC-I008: Get invoice — IDOR check
   it('I-008: getting invoice from another company returns 403', async () => {
     const companyBInvoice = mockInvoice({ companyId: COMPANY_B });

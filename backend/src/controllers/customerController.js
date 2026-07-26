@@ -1,7 +1,19 @@
 const prisma = require('../lib/prisma');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
+const fbrService = require('../services/fbrService');
 
 const MAX_TAKE = 100;
+
+// ── Real-time NTN/CNIC verification against FBR ───────────────────────────────
+// Soft check only — a failed/unreachable lookup returns verified:false with a
+// reason, it never throws. Format validation at invoice-submit time (INV-6)
+// remains the actual gate; this just gives the user an early heads-up while
+// they're still typing the customer's details in.
+const verifyRegistration = asyncHandler(async (req, res) => {
+  const { regNo } = req.params;
+  const result = await fbrService.verifyRegistration(regNo);
+  res.json(result);
+});
 
 const createCustomer = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
@@ -120,4 +132,4 @@ const deleteCustomer = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Customer deleted' });
 });
 
-module.exports = { createCustomer, listCustomers, getCustomer, updateCustomer, deleteCustomer };
+module.exports = { createCustomer, listCustomers, getCustomer, updateCustomer, deleteCustomer, verifyRegistration };

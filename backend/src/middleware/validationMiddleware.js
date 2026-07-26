@@ -8,6 +8,33 @@ const MAX = {
   email: 254,
 };
 
+const createInvoiceBody = Joi.object({
+  customerId: Joi.string().max(50).required(),
+  invoiceDate: Joi.date().required(),
+  invoiceType: Joi.string()
+    .valid('NORMAL_SALES_TAX_INVOICE', 'DEBIT_NOTE', 'CREDIT_NOTE', 'EXPORT_INVOICE')
+    .required(),
+  referenceInvoiceNo: Joi.string().max(100).optional().allow(''),
+  items: Joi.array().items(
+    Joi.object({
+      productId: Joi.string().max(50).required(),
+      quantity: Joi.number().positive().max(999999).precision(4).required(),
+      unitPrice: Joi.number().min(0).max(99999999).precision(4).required(),
+      discountAmount: Joi.number().min(0).max(99999999).precision(4).optional().default(0),
+      taxRate: Joi.number().valid(0, 5, 10, 18).required(),
+      saleType: Joi.string().valid('Goods', 'Services', 'Zero-Rated', 'Exempt', 'Third Schedule').optional().default('Goods'),
+      salesTaxWithheldAtSource: Joi.number().min(0).max(99999999).precision(2).optional().default(0),
+      fedPayable: Joi.number().min(0).max(99999999).precision(2).optional().default(0),
+      sroScheduleNo: Joi.string().max(100).optional().allow('', null),
+      sroItemSerialNo: Joi.string().max(50).optional().allow('', null),
+    })
+  ).min(1).max(100).required(),
+  paymentTerms: Joi.string().max(200).optional().allow(''),
+  paymentMethod: Joi.string().valid('CASH', 'BANK_TRANSFER', 'CHEQUE', 'ONLINE', 'CREDIT').optional().default('CASH'),
+  deliveryTerms: Joi.string().max(200).optional().allow(''),
+  remarks: Joi.string().max(MAX.remarks).optional().allow(''),
+});
+
 const schemas = {
   registerUser: Joi.object({
     email: Joi.string().email().max(MAX.email).required()
@@ -125,31 +152,10 @@ const schemas = {
     role: Joi.string().valid('ADMIN', 'ACCOUNTANT', 'STAFF').required(),
   }),
 
-  createInvoice: Joi.object({
-    customerId: Joi.string().max(50).required(),
-    invoiceDate: Joi.date().required(),
-    invoiceType: Joi.string()
-      .valid('NORMAL_SALES_TAX_INVOICE', 'DEBIT_NOTE', 'CREDIT_NOTE', 'EXPORT_INVOICE')
-      .required(),
-    referenceInvoiceNo: Joi.string().max(100).optional().allow(''),
-    items: Joi.array().items(
-      Joi.object({
-        productId: Joi.string().max(50).required(),
-        quantity: Joi.number().positive().max(999999).precision(4).required(),
-        unitPrice: Joi.number().min(0).max(99999999).precision(4).required(),
-        discountAmount: Joi.number().min(0).max(99999999).precision(4).optional().default(0),
-        taxRate: Joi.number().valid(0, 5, 10, 18).required(),
-        saleType: Joi.string().valid('Goods', 'Services', 'Zero-Rated', 'Exempt', 'Third Schedule').optional().default('Goods'),
-        salesTaxWithheldAtSource: Joi.number().min(0).max(99999999).precision(2).optional().default(0),
-        fedPayable: Joi.number().min(0).max(99999999).precision(2).optional().default(0),
-        sroScheduleNo: Joi.string().max(100).optional().allow('', null),
-        sroItemSerialNo: Joi.string().max(50).optional().allow('', null),
-      })
-    ).min(1).max(100).required(),
-    paymentTerms: Joi.string().max(200).optional().allow(''),
-    paymentMethod: Joi.string().valid('CASH', 'BANK_TRANSFER', 'CHEQUE', 'ONLINE', 'CREDIT').optional().default('CASH'),
-    deliveryTerms: Joi.string().max(200).optional().allow(''),
-    remarks: Joi.string().max(MAX.remarks).optional().allow(''),
+  createInvoice: createInvoiceBody,
+
+  bulkCreateInvoice: Joi.object({
+    invoices: Joi.array().items(createInvoiceBody).min(1).max(50).required(),
   }),
 };
 
