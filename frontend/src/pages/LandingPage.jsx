@@ -84,6 +84,15 @@ const businessTypes = [
   'ڈینٹری بیوٹر', 'الیکٹرونکس اینڈ الیکٹرک', 'فارمہ ڈسٹری بیوٹر', 'سینٹری اینڈ ہارڈویئر',
 ];
 
+const comparisonRows = [
+  { feature: 'Invoice limit', urdu: 'انوائس کی حد', nizaam: 'Unlimited — flat PKR 2,500/month', others: 'Usually capped per plan, more invoices cost more' },
+  { feature: 'Customer self-service portal', urdu: 'کسٹمر پورٹل', nizaam: true, others: false },
+  { feature: 'Customer ledger & outstanding balance', urdu: 'کسٹمر لیجر', nizaam: true, others: false },
+  { feature: 'Quotations before invoicing', urdu: 'کوٹیشنز', nizaam: true, others: 'Rare' },
+  { feature: 'Free trial', urdu: 'مفت ٹرائل', nizaam: '5 invoices, no card needed', others: 'Often paid-only from day one' },
+  { feature: 'FBR IRN + QR code', urdu: 'آئی آر این اور کیو آر کوڈ', nizaam: true, others: true },
+];
+
 const plans = [
   {
     name: 'Trial',
@@ -113,6 +122,20 @@ const plans = [
     cta: 'Contact Us',
   },
 ];
+
+function ComparisonCell({ value, positive }) {
+  if (value === true) {
+    return (
+      <svg className="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke={positive ? '#059669' : '#9CA3AF'} strokeWidth="2.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+    );
+  }
+  if (value === false) {
+    return <span className="text-neutral-300 text-lg">—</span>;
+  }
+  return <span className={`text-xs ${positive ? 'font-semibold' : 'text-neutral-400'}`} style={positive ? { color: '#0C3D5E' } : {}}>{value}</span>;
+}
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -228,13 +251,52 @@ export default function LandingPage() {
             { val: '7', label: 'Invoice Scenarios Live' },
             { val: '3%', label: 'Further Tax Auto-Applied' },
             { val: '< 2s', label: 'Invoice Generation Time' },
-            { val: 'SSL', label: 'Encrypted & Secure' },
+            { val: 'AES-256', label: 'Encrypted & Secure' },
           ].map((s, i) => (
             <div key={i} className="min-w-20">
               <div className="text-2xl font-extrabold" style={{ color: '#0C3D5E', fontVariantNumeric: 'tabular-nums' }}>{s.val}</div>
               <div className="text-xs text-neutral-400 mt-0.5">{s.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Nizaam vs typical FBR software */}
+      <section className="py-20 px-6 bg-neutral-50">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-neutral-900 mb-2">Nizaam vs Typical FBR Software</h2>
+            <p className="text-neutral-500" style={{ direction: 'rtl', fontFamily: 'system-ui' }}>عام ایف بی آر سافٹ ویئر کے مقابلے میں نظام</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-100">
+                    <th className="text-left py-4 px-5 font-semibold text-neutral-500 text-xs uppercase tracking-wide">Feature</th>
+                    <th className="text-center py-4 px-5 font-bold text-sm" style={{ color: '#0C3D5E' }}>Nizaam</th>
+                    <th className="text-center py-4 px-5 font-semibold text-neutral-400 text-sm">Typical FBR Software</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row, i) => (
+                    <tr key={i} className={i !== comparisonRows.length - 1 ? 'border-b border-neutral-50' : ''}>
+                      <td className="py-4 px-5">
+                        <div className="font-medium text-neutral-800">{row.feature}</div>
+                        <div className="text-xs text-neutral-400 mt-0.5" style={{ direction: 'rtl', fontFamily: 'system-ui' }}>{row.urdu}</div>
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        <ComparisonCell value={row.nizaam} positive />
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        <ComparisonCell value={row.others} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
