@@ -164,7 +164,7 @@ export default function InvoiceForm() {
   };
 
   const actions = (
-    <button type="button" onClick={() => navigate('/')} className="btn btn-outline btn-sm">
+    <button type="button" onClick={() => navigate('/dashboard')} className="btn btn-outline btn-sm">
       ← Back
     </button>
   );
@@ -523,7 +523,7 @@ export default function InvoiceForm() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/dashboard')}
             className="btn btn-outline btn-lg sm:w-40"
           >
             Cancel

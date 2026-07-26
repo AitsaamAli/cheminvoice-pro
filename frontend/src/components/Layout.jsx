@@ -74,7 +74,7 @@ const LogoAtom = () => (
 );
 
 const NAV = [
-  { path: '/', label: 'Dashboard', Icon: IcDash, exact: true },
+  { path: '/dashboard', label: 'Dashboard', Icon: IcDash, exact: true },
   { path: '/invoices/create', label: 'New Invoice', Icon: IcInvoice },
   { path: '/quotations', label: 'Quotations', Icon: IcQuote },
   { path: '/customers', label: 'Customers', Icon: IcCustomers },

@@ -60,7 +60,7 @@ function AdminRoute({ children }) {
   const token = localStorage.getItem('accessToken');
   if (!token) return <Navigate to="/login" />;
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  return user.role === 'SUPERADMIN' ? children : <Navigate to="/" />;
+  return user.role === 'SUPERADMIN' ? children : <Navigate to="/dashboard" />;
 }
 
 function UserRoute({ children }) {
@@ -81,8 +81,9 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<LandingPage />} />
         <Route
-          path="/"
+          path="/dashboard"
           element={
             <UserRoute>
               <Dashboard />

@@ -40,7 +40,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('pending');
 
   useEffect(() => {
-    if (user.role !== 'SUPERADMIN') { navigate('/'); return; }
+    if (user.role !== 'SUPERADMIN') { navigate('/dashboard'); return; }
     load();
   }, []);
 
@@ -112,7 +112,7 @@ export default function AdminPanel() {
           <button onClick={load} className="text-xs text-neutral-500 hover:text-neutral-800 border border-neutral-200 rounded-lg px-3 py-1.5 transition-colors">
             Refresh
           </button>
-          <button onClick={() => navigate('/')} className="text-sm text-neutral-500 hover:text-neutral-800 transition-colors flex items-center gap-1.5">
+          <button onClick={() => navigate('/dashboard')} className="text-sm text-neutral-500 hover:text-neutral-800 transition-colors flex items-center gap-1.5">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>

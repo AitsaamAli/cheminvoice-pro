@@ -60,7 +60,7 @@ export default function LoginPage() {
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('user', JSON.stringify(data.user));
-      navigate(data.user.role === 'SUPERADMIN' ? '/admin' : '/');
+      navigate(data.user.role === 'SUPERADMIN' ? '/admin' : '/dashboard');
     } catch (err) {
       const msg = err.response?.data?.error || '';
       if (msg.startsWith('PENDING_APPROVAL:')) {
